@@ -1,0 +1,9 @@
+name = "superbowl-squares-api-proxy"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[env.production]
+vars = { BACKEND_URL = "https://your-backend-api.com" }
+
+[env.development]
+vars = { BACKEND_URL = "http://localhost:8080" }

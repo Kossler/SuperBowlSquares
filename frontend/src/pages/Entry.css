@@ -1,0 +1,41 @@
+.pool-details {
+  margin-top: 20px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.info-item {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.stats {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #e7f3ff;
+  border-radius: 4px;
+}
+
+.stats p {
+  margin: 5px 0;
+  font-size: 16px;
+}
+
+.instructions {
+  padding: 15px;
+  background-color: #fff3cd;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  color: #856404;
+}
+
+.grid-wrapper {
+  overflow-x: auto;
+  padding: 20px 0;
+}

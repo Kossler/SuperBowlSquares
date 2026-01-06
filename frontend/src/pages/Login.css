@@ -1,0 +1,26 @@
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 100px);
+  padding: 20px;
+}
+
+.login-card {
+  max-width: 500px;
+  width: 100%;
+}
+
+.profile-input-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.profile-input-group input {
+  flex: 1;
+}
+
+.profile-input-group .btn {
+  padding: 8px 15px;
+}

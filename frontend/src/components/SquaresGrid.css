@@ -1,0 +1,139 @@
+.grid-wrapper {
+  overflow-x: auto;
+  margin: 20px 0;
+}
+
+.grid-container {
+  display: inline-block;
+  min-width: fit-content;
+  background: white;
+  border: 2px solid #333;
+}
+
+/* Score rows container - 4 rows above grid */
+.score-rows-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.score-row {
+  display: flex;
+  height: 30px;
+}
+
+.quarter-label {
+  width: 160px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 16px;
+  border: 1px solid #333;
+}
+
+.score-row.quarter-1 .quarter-label { background: #ffeb3b; }
+.score-row.quarter-2 .quarter-label { background: #ff9800; }
+.score-row.quarter-3 .quarter-label { background: #4caf50; }
+.score-row.quarter-4 .quarter-label { background: #00bcd4; }
+
+.score-row .score-cell {
+  width: 80px;
+  height: 30px;
+  border: 1px solid #333;
+  border-left: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.score-row.quarter-1 .score-cell { background: #ffeb3b; }
+.score-row.quarter-2 .score-cell { background: #ff9800; }
+.score-row.quarter-3 .score-cell { background: #4caf50; }
+.score-row.quarter-4 .score-cell { background: #00bcd4; }
+
+/* Main grid area with NFC score columns on left */
+.main-grid-area {
+  display: flex;
+  flex-direction: column;
+}
+
+.squares-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.grid-row-wrapper {
+  display: flex;
+  height: 60px;
+}
+
+.nfc-score-columns {
+  display: flex;
+  flex-direction: row;
+  width: 160px;
+}
+
+.score-cell.nfc-score {
+  width: 40px;
+  height: 60px;
+  border: 1px solid #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.score-cell.nfc-score.quarter-1 { background: #ffeb3b; }
+.score-cell.nfc-score.quarter-2 { background: #ff9800; }
+.score-cell.nfc-score.quarter-3 { background: #4caf50; }
+.score-cell.nfc-score.quarter-4 { background: #00bcd4; }
+
+.grid-row {
+  display: flex;
+}
+
+.grid-square {
+  width: 80px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #333;
+  border-left: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 12px;
+  text-align: center;
+  padding: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grid-square.available {
+  background-color: #f8f9fa;
+}
+
+.grid-square.available:hover {
+  background-color: #e9ecef;
+  transform: scale(1.05);
+}
+
+.grid-square.claimed {
+  background-color: #d4edda;
+  cursor: default;
+}
+
+.grid-square.owned {
+  background-color: #cfe2ff;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.grid-square.owned:hover {
+  background-color: #b6d4ff;
+  transform: scale(1.05);
+}
