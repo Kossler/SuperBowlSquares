@@ -1,3 +1,8 @@
+// Get all profiles with user email (for admin assignment)
+export const getAllProfiles = async () => {
+  const response = await api.get('/api/admin/profiles');
+  return response.data;
+}
 import api from './api'
 import { setToken, setUser } from '../utils/auth'
 

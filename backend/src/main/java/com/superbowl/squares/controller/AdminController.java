@@ -1,3 +1,4 @@
+
 package com.superbowl.squares.controller;
 
 import com.fasterxml.jackson.annotation.JsonView;
@@ -38,6 +39,13 @@ public class AdminController {
 
     @Autowired
     private AdminService adminService;
+
+    // Get all profiles with user email for admin assignment
+    @GetMapping("/profiles")
+    public ResponseEntity<List<Map<String, Object>>> getAllProfiles() {
+        List<Map<String, Object>> profiles = adminService.getAllProfilesWithUserEmail();
+        return ResponseEntity.ok(profiles);
+    }
 
     @PostMapping("/pools")
     public ResponseEntity<Pool> createPool(@Valid @RequestBody CreatePoolRequest request) {

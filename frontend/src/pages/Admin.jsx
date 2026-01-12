@@ -17,10 +17,12 @@ import {
   createPaymentInfo,
   updatePaymentInfo,
   deletePaymentInfo,
+  updateCellInSheet,
+  getPoolById
 } from '../services/squaresService'
 import './Admin.css'
 import SquaresGrid from '../components/SquaresGrid'
-import { getSquaresByPool, claimSquare, unclaimSquare, getAllUsers as fetchAllUsers } from '../services/squaresService'
+import { getSquaresByPool, claimSquare, unclaimSquare, getAllUsers as fetchAllUsers, getAllProfiles } from '../services/squaresService'
 
 function Admin() {
     // All useState declarations at the top
@@ -76,36 +78,37 @@ function Admin() {
         setNfcScores(null);
       }
     }, [showEditPool, editPool]);
-    // Load all profiles for admin editing
+
+    // Always load all profiles when Edit Square modal is open
     useEffect(() => {
-      if (activeTab === 'edit-squares') {
-        // Fetch all users and flatten their profiles
-        fetchAllUsers().then(res => {
-          const users = res.data || res;
-          const profiles = users.flatMap(u => (u.profiles || []).map(p => ({...p, userEmail: u.email})));
-          setAllProfiles(profiles);
+      if (showEditSquareModal) {
+        getAllProfiles().then(profiles => {
+          setAllProfiles(Array.isArray(profiles) ? profiles : []);
         });
-        // Load pools for pool selection
-        getAllPools().then(setPools);
       }
-    }, [activeTab]);
+    }, [showEditSquareModal]);
 
     // Load squares for selected pool
     useEffect(() => {
-      if (activeTab === 'edit-squares' && editSquaresPool) {
-        getSquaresByPool(editSquaresPool.id).then(setEditSquares);
+      if (showEditPool && editPool && editPool.id) {
+        getSquaresByPool(editPool.id).then(squares => {
+          console.log('DEBUG: Loaded squares for pool', editPool.id, squares);
+          setEditSquares(squares);
+        });
       }
-    }, [activeTab, editSquaresPool]);
+    }, [showEditPool, editPool]);
     // Admin square click handler
     const handleAdminSquareClick = (square) => {
       setSelectedSquare(square);
-      setSelectedProfileId(square.profile?.id || '');
+      setSelectedProfileId(square?.profile?.id || '');
+      setEditSquaresPool(editPool); // Ensure the pool context is set
       setShowEditSquareModal(true);
       setEditSquaresError('');
     };
 
     // Admin assign profile to square
     const handleAdminAssignProfile = async () => {
+      console.log('DEBUG: Save clicked', { selectedSquare, editSquaresPool, selectedProfileId });
       if (!selectedSquare || !editSquaresPool) return;
       try {
         if (selectedProfileId) {
@@ -116,10 +119,30 @@ function Admin() {
             profileId: parseInt(selectedProfileId),
           });
         } else {
+          // If already unassigned, just close modal
+          if (!selectedSquare.profile && !selectedSquare.profileName) {
+            setShowEditSquareModal(false);
+            return;
+          }
           await unclaimSquare(editSquaresPool.id, selectedSquare.rowPosition, selectedSquare.colPosition);
         }
+
+        // --- Google Sheets Sync Logic ---
+        const pool = await getPoolById(editSquaresPool.id);
+        const spreadsheetId = '1zXue8QE0GBV5GRWv7k5JSR67yRjMf3o7Cj9egY4Fguk';
+        const sheetName = pool.poolName || 'Sheet1';
+        const value = selectedProfileId
+          ? (allProfiles.find(p => p.id === parseInt(selectedProfileId))?.fullName || '')
+          : '';
+        await updateCellInSheet(
+          spreadsheetId,
+          sheetName,
+          selectedSquare.rowPosition,
+          selectedSquare.colPosition,
+          value
+        );
+
         setShowEditSquareModal(false);
-        // Refresh grid
         getSquaresByPool(editSquaresPool.id).then(setEditSquares);
       } catch (err) {
         setEditSquaresError('Failed to update square.');
@@ -764,6 +787,7 @@ function Admin() {
                 </div>
               </form>
               <div style={{ flex: 1, minWidth: 0, maxWidth: 'fit-content' }}>
+                {/* Edit Square Panel removed; will show as modal popup below */}
                 <h3>Edit Squares for this Pool</h3>
                 <div className="grid-wrapper">
                   <div className="grid-container">
@@ -886,16 +910,23 @@ function Admin() {
                               {/* Grid squares for this row */}
                               <div className="grid-row">
                                 {Array.from({ length: 10 }).map((_, col) => {
-                                  const square = editSquares.find(sq => sq.rowPosition === row && sq.colPosition === col) || {};
+                                  let square = editSquares.find(sq => sq.rowPosition === row && sq.colPosition === col);
+                                  if (!square) {
+                                    square = { rowPosition: row, colPosition: col };
+                                  }
+                                  const isClaimed = (square?.profile && square?.profile?.id) || square?.profileName;
+                                  if (isClaimed) {
+                                    console.log(`DEBUG: Claimed square at row ${row}, col ${col}:`, square);
+                                  }
                                   return (
                                     <div
                                       key={`square-${row}-${col}`}
-                                      className={`grid-square ${(square?.profile && square?.profile?.id) ? 'claimed' : 'available'}`}
+                                      className={`grid-square ${isClaimed ? 'claimed' : 'available'}`}
                                       title={square?.profileName || 'Available'}
                                       style={{ cursor: 'pointer' }}
                                       onClick={() => handleAdminSquareClick(square)}
                                     >
-                                      {square?.profileName || ''}
+                                      {isClaimed ? (square?.profileName || 'Occupied') : ''}
                                     </div>
                                   );
                                 })}
@@ -910,29 +941,57 @@ function Admin() {
               </div>
             </div>
           </div>
-          {/* Edit Square Modal (should be outside flex row) */}
-          {showEditSquareModal && (
-            <div className="modal-overlay">
-              <div className="modal-content">
-                <h3>Edit Square</h3>
-                <p>Row: {selectedSquare?.rowPosition}, Col: {selectedSquare?.colPosition}</p>
-                <div className="form-group">
-                  <label>Assign Profile:</label>
-                  <select value={selectedProfileId} onChange={e => setSelectedProfileId(e.target.value)}>
-                    <option value="">-- Unassigned --</option>
-                    {allProfiles.map(profile => (
+      {/* Edit Square Modal as true popup, outside Edit Pool modal */}
+      {showEditSquareModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Edit Square</h3>
+            <p>Row: {selectedSquare?.rowPosition ?? '--'}, Col: {selectedSquare?.colPosition ?? '--'}</p>
+            <div className="form-group">
+              <label>Assign Profile:</label>
+              <select value={selectedProfileId} onChange={e => setSelectedProfileId(e.target.value)}>
+                <option value="">-- Unassigned --</option>
+                {allProfiles.length === 0
+                  ? <option disabled>-- No profiles found --</option>
+                  : [...allProfiles].sort((a, b) => a.fullName.localeCompare(b.fullName)).map(profile => (
                       <option key={profile.id} value={profile.id}>{profile.fullName} ({profile.userEmail})</option>
                     ))}
-                  </select>
-                </div>
-                {editSquaresError && <div className="error">{editSquaresError}</div>}
-                <div className="form-actions">
-                  <button className="btn btn-primary" onClick={handleAdminAssignProfile}>Save</button>
-                  <button className="btn btn-secondary" onClick={() => setShowEditSquareModal(false)}>Cancel</button>
-                </div>
-              </div>
+              </select>
             </div>
-          )}
+            {editSquaresError && <div className="error">{editSquaresError}</div>}
+            <div className="form-actions">
+              <button className="btn btn-primary" onClick={handleAdminAssignProfile}>Save</button>
+              <button
+                className="btn"
+                style={{ marginLeft: '8px', backgroundColor: '#e74c3c', color: 'white' }}
+                onClick={async () => {
+                  if (!selectedSquare || !editSquaresPool) return;
+                  try {
+                    await unclaimSquare(editSquaresPool.id, selectedSquare.rowPosition, selectedSquare.colPosition);
+                    // Google Sheets sync for removal
+                    const pool = await getPoolById(editSquaresPool.id);
+                    const spreadsheetId = '1zXue8QE0GBV5GRWv7k5JSR67yRjMf3o7Cj9egY4Fguk';
+                    const sheetName = pool.poolName || 'Sheet1';
+                    await updateCellInSheet(
+                      spreadsheetId,
+                      sheetName,
+                      selectedSquare.rowPosition,
+                      selectedSquare.colPosition,
+                      ''
+                    );
+                    setShowEditSquareModal(false);
+                    getSquaresByPool(editSquaresPool.id).then(setEditSquares);
+                  } catch (err) {
+                    setEditSquaresError('Failed to remove entry.');
+                  }
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
         </div>
       )}
     </div>

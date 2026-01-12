@@ -23,6 +23,18 @@ import java.util.stream.Collectors;
 
 @Service
 public class AdminService {
+    // Return all profiles with user email for admin assignment
+    public List<Map<String, Object>> getAllProfilesWithUserEmail() {
+        List<Profile> profiles = profileRepository.findAll();
+        return profiles.stream().map(profile -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", profile.getId());
+            map.put("fullName", profile.getFullName());
+            map.put("profileNumber", profile.getProfileNumber());
+            map.put("userEmail", profile.getUser() != null ? profile.getUser().getEmail() : null);
+            return map;
+        }).collect(Collectors.toList());
+    }
 
     @Autowired
     private WinnerRepository winnerRepository;

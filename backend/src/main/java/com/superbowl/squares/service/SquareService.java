@@ -34,14 +34,17 @@ public class SquareService {
     @Transactional
     @SuppressWarnings("null")
     public Square claimSquare(ClaimSquareRequest request) {
+
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new RuntimeException("User not found"));
 
         Profile profile = profileRepository.findById(request.getProfileId())
-                .orElseThrow(() -> new RuntimeException("Profile not found"));
+            .orElseThrow(() -> new RuntimeException("Profile not found"));
 
-        if (!profile.getUser().getId().equals(user.getId())) {
+        // Allow admins to assign any profile, but regular users can only assign their own
+        boolean isAdmin = user.getIsAdmin() != null && user.getIsAdmin();
+        if (!isAdmin && !profile.getUser().getId().equals(user.getId())) {
             throw new RuntimeException("Profile does not belong to user");
         }
 
@@ -64,16 +67,18 @@ public class SquareService {
     public Square unclaimSquare(Long poolId, Integer rowPosition, Integer colPosition) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new RuntimeException("User not found"));
 
         Square square = squareRepository.findByPoolIdAndRowPositionAndColPosition(poolId, rowPosition, colPosition)
-                .orElseThrow(() -> new RuntimeException("Square not found"));
+            .orElseThrow(() -> new RuntimeException("Square not found"));
 
         if (square.getProfile() == null) {
             throw new RuntimeException("Square is not claimed");
         }
 
-        if (!square.getProfile().getUser().getId().equals(user.getId())) {
+        boolean isAdmin = user.getIsAdmin() != null && user.getIsAdmin();
+        // Allow admins to unclaim any square, users only their own
+        if (!isAdmin && !square.getProfile().getUser().getId().equals(user.getId())) {
             throw new RuntimeException("You can only unclaim your own squares");
         }
 

@@ -67,28 +67,37 @@ public class GoogleSheetsService {
         int a1Col = baseCol + col;
         int a1Row = baseRow + row;
 
-        com.google.api.services.sheets.v4.model.CellData cellData = new com.google.api.services.sheets.v4.model.CellData()
-                .setUserEnteredValue(new com.google.api.services.sheets.v4.model.ExtendedValue().setStringValue(value));
-
         com.google.api.services.sheets.v4.model.GridRange gridRange = new com.google.api.services.sheets.v4.model.GridRange()
-                .setSheetId(sheetId)
-                .setStartRowIndex(a1Row - 1)
-                .setEndRowIndex(a1Row)
-                .setStartColumnIndex(a1Col - 1)
-                .setEndColumnIndex(a1Col);
+            .setSheetId(sheetId)
+            .setStartRowIndex(a1Row - 1)
+            .setEndRowIndex(a1Row)
+            .setStartColumnIndex(a1Col - 1)
+            .setEndColumnIndex(a1Col);
 
-        com.google.api.services.sheets.v4.model.RepeatCellRequest repeatCellRequest = new com.google.api.services.sheets.v4.model.RepeatCellRequest()
+        if (value == null || value.isEmpty()) {
+            // Explicitly clear the cell
+            com.google.api.services.sheets.v4.model.Request clearRequest = new com.google.api.services.sheets.v4.model.Request()
+            .setUpdateCells(new com.google.api.services.sheets.v4.model.UpdateCellsRequest()
                 .setRange(gridRange)
-                .setCell(cellData)
-                .setFields("userEnteredValue");
-
-        com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest batchRequest = new com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest()
-                .setRequests(Collections.singletonList(
-                        new com.google.api.services.sheets.v4.model.Request().setRepeatCell(repeatCellRequest)
-                ));
-
-        service.spreadsheets().batchUpdate(spreadsheetId, batchRequest).execute();
-        logger.info("Single cell batchUpdate request sent to Google Sheets API (formatting preserved).");
+                .setFields("userEnteredValue"));
+            com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest batchRequest = new com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest()
+            .setRequests(Collections.singletonList(clearRequest));
+            service.spreadsheets().batchUpdate(spreadsheetId, batchRequest).execute();
+            logger.info("Cell cleared in Google Sheets API.");
+        } else {
+            com.google.api.services.sheets.v4.model.CellData cellData = new com.google.api.services.sheets.v4.model.CellData()
+            .setUserEnteredValue(new com.google.api.services.sheets.v4.model.ExtendedValue().setStringValue(value));
+            com.google.api.services.sheets.v4.model.RepeatCellRequest repeatCellRequest = new com.google.api.services.sheets.v4.model.RepeatCellRequest()
+            .setRange(gridRange)
+            .setCell(cellData)
+            .setFields("userEnteredValue");
+            com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest batchRequest = new com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest()
+            .setRequests(Collections.singletonList(
+                new com.google.api.services.sheets.v4.model.Request().setRepeatCell(repeatCellRequest)
+            ));
+            service.spreadsheets().batchUpdate(spreadsheetId, batchRequest).execute();
+            logger.info("Single cell batchUpdate request sent to Google Sheets API (formatting preserved).");
+        }
     }
 
     // Helper to get sheetId from sheet name
