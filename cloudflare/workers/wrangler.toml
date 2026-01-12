@@ -1,6 +1,27 @@
-name = "superbowl-squares-api-proxy"
+name = "superbowl-squares-worker"
 main = "src/index.js"
-compatibility_date = "2024-01-01"
+compatibility_date = "2026-01-12"
+type = "javascript"
+
+# Set your Cloudflare account ID
+account_id = "<YOUR_CLOUDFLARE_ACCOUNT_ID>"
+workers_dev = true
+
+# Uncomment and set your custom domain if deploying to production
+# routes = ["yourdomain.com/*"]
+
+# Example KV namespace (uncomment if needed)
+# [[kv_namespaces]]
+# binding = "SQUARES_KV"
+# id = "<YOUR_KV_NAMESPACE_ID>"
+
+# Example Durable Object (uncomment if needed)
+# [[durable_objects]]
+# name = "SquaresObject"
+# class_name = "SquaresObject"
+# script_name = "src/squares-object.js"
+
+# Set environment variables/secrets via Wrangler CLI
 
 [env.production]
 vars = { BACKEND_URL = "https://your-backend-api.com" }
