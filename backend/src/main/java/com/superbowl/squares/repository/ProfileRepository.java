@@ -10,4 +10,5 @@ import java.util.List;
 public interface ProfileRepository extends JpaRepository<Profile, Long> {
     List<Profile> findByUserId(Long userId);
     long countByUserId(Long userId);
+    boolean existsByFullNameIgnoreCase(String fullName);
 }

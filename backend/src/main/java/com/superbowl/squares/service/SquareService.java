@@ -32,6 +32,7 @@ public class SquareService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public Square claimSquare(ClaimSquareRequest request) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email)

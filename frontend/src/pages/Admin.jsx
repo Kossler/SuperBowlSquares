@@ -1,3 +1,5 @@
+// Add AFC/NFC score fetching for Edit Pool modal
+import { getAfcScoresFromSheet, getNfcScoresFromSheet } from '../services/squaresService'
 import { useState, useEffect } from 'react'
 import {
   getAllPools,
@@ -5,52 +7,327 @@ import {
   togglePoolStatus,
   updatePool,
   deletePool,
+  getAllUsers,
+  makeUserAdmin,
+  updateUser,
+  getUserById,
+  createProfile,
+  updateProfile,
+  deleteProfile,
+  createPaymentInfo,
+  updatePaymentInfo,
+  deletePaymentInfo,
 } from '../services/squaresService'
 import './Admin.css'
+import SquaresGrid from '../components/SquaresGrid'
+import { getSquaresByPool, claimSquare, unclaimSquare, getAllUsers as fetchAllUsers } from '../services/squaresService'
 
 function Admin() {
-  const [activeTab, setActiveTab] = useState('pools')
-  const [pools, setPools] = useState([])
-  const [showCreatePool, setShowCreatePool] = useState(false)
-  const [showEditPool, setShowEditPool] = useState(false)
-  const [editingPool, setEditingPool] = useState(null)
-  const [newPool, setNewPool] = useState({
-    poolName: '',
-    betAmount: '',
-  })
-  const [editPool, setEditPool] = useState({
-    id: '',
-    poolName: '',
-    betAmount: '',
-  })
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
+    // All useState declarations at the top
+    const [activeTab, setActiveTab] = useState('pools');
+    const [editSquaresPool, setEditSquaresPool] = useState(null);
+    const [editSquares, setEditSquares] = useState([]);
+    const [allProfiles, setAllProfiles] = useState([]);
+    const [showEditSquareModal, setShowEditSquareModal] = useState(false);
+    const [selectedSquare, setSelectedSquare] = useState(null);
+    const [selectedProfileId, setSelectedProfileId] = useState('');
+    const [editSquaresError, setEditSquaresError] = useState('');
+    const [pools, setPools] = useState([]);
+    const [users, setUsers] = useState([]);
+    const [showCreatePool, setShowCreatePool] = useState(false);
+    const [showEditPool, setShowEditPool] = useState(false);
+    const [editingPool, setEditingPool] = useState(null);
+    const [editingUser, setEditingUser] = useState(null);
+    const [showEditUser, setShowEditUser] = useState(false);
+    const [activeModalTab, setActiveModalTab] = useState('details');
+    const [userUpdateData, setUserUpdateData] = useState({ email: '', password: '' });
+    const [profileData, setProfileData] = useState({ fullName: '', profileNumber: '' });
+    const [paymentInfoData, setPaymentInfoData] = useState({ paymentMethod: 'Venmo', accountIdentifier: '', isPrimary: true });
+    const [editingProfile, setEditingProfile] = useState(null);
+    const [editingPaymentInfo, setEditingPaymentInfo] = useState(null);
+    // useState declarations for newPool, editPool, message, and error
+    const [editPool, setEditPool] = useState(null);
+    const [newPool, setNewPool] = useState({ poolName: '', betAmount: '' });
+    const [message, setMessage] = useState('');
+    const [error, setError] = useState('');
+    // AFC/NFC scores for the edit pool modal
+    const [afcScores, setAfcScores] = useState(null);
+    const [nfcScores, setNfcScores] = useState(null);
+
+    // Fetch AFC/NFC scores when editPool changes (Edit Pool modal open)
+    useEffect(() => {
+      if (showEditPool && editPool && editPool.poolName) {
+        const fetchScores = async () => {
+          try {
+            const spreadsheetId = '1zXue8QE0GBV5GRWv7k5JSR67yRjMf3o7Cj9egY4Fguk';
+            const sheetName = editPool.poolName || 'Sheet1';
+            const afc = await getAfcScoresFromSheet(spreadsheetId, sheetName);
+            setAfcScores(afc);
+            const nfc = await getNfcScoresFromSheet(spreadsheetId, sheetName);
+            setNfcScores(nfc);
+          } catch (err) {
+            setAfcScores(null);
+            setNfcScores(null);
+          }
+        };
+        fetchScores();
+      } else {
+        setAfcScores(null);
+        setNfcScores(null);
+      }
+    }, [showEditPool, editPool]);
+    // Load all profiles for admin editing
+    useEffect(() => {
+      if (activeTab === 'edit-squares') {
+        // Fetch all users and flatten their profiles
+        fetchAllUsers().then(res => {
+          const users = res.data || res;
+          const profiles = users.flatMap(u => (u.profiles || []).map(p => ({...p, userEmail: u.email})));
+          setAllProfiles(profiles);
+        });
+        // Load pools for pool selection
+        getAllPools().then(setPools);
+      }
+    }, [activeTab]);
+
+    // Load squares for selected pool
+    useEffect(() => {
+      if (activeTab === 'edit-squares' && editSquaresPool) {
+        getSquaresByPool(editSquaresPool.id).then(setEditSquares);
+      }
+    }, [activeTab, editSquaresPool]);
+    // Admin square click handler
+    const handleAdminSquareClick = (square) => {
+      setSelectedSquare(square);
+      setSelectedProfileId(square.profile?.id || '');
+      setShowEditSquareModal(true);
+      setEditSquaresError('');
+    };
+
+    // Admin assign profile to square
+    const handleAdminAssignProfile = async () => {
+      if (!selectedSquare || !editSquaresPool) return;
+      try {
+        if (selectedProfileId) {
+          await claimSquare({
+            poolId: editSquaresPool.id,
+            rowPosition: selectedSquare.rowPosition,
+            colPosition: selectedSquare.colPosition,
+            profileId: parseInt(selectedProfileId),
+          });
+        } else {
+          await unclaimSquare(editSquaresPool.id, selectedSquare.rowPosition, selectedSquare.colPosition);
+        }
+        setShowEditSquareModal(false);
+        // Refresh grid
+        getSquaresByPool(editSquaresPool.id).then(setEditSquares);
+      } catch (err) {
+        setEditSquaresError('Failed to update square.');
+      }
+    };
+  // Removed duplicate useState declarations for pools, users, showCreatePool, showEditPool, editingPool, editingUser, showEditUser, activeModalTab, userUpdateData, profileData, paymentInfoData, editingProfile, editingPaymentInfo
+
+  // Removed duplicate useState declarations for newPool, editPool, message, and error
 
   useEffect(() => {
     if (activeTab === 'pools') {
       loadPools()
+    } else if (activeTab === 'users') {
+      loadUsers()
     }
   }, [activeTab])
 
+  useEffect(() => {
+    if (editingUser) {
+      setUserUpdateData({ email: editingUser.email, password: '' });
+      setProfileData({ fullName: '', profileNumber: '' });
+      setPaymentInfoData({ paymentMethod: 'Venmo', accountIdentifier: '', isPrimary: true });
+      setEditingProfile(null);
+      setEditingPaymentInfo(null);
+    }
+  }, [editingUser]);
+
   const loadPools = async () => {
     try {
-      const data = await getAllPools()
-      setPools(data)
+      const response = await getAllPools()
+      setPools(response)
     } catch (err) {
       setError('Failed to load pools')
     }
   }
+
+  const loadUsers = async () => {
+    try {
+      const response = await getAllUsers()
+      console.log('Data from getAllUsers:', response); // Debugging log
+      if (response && Array.isArray(response.data)) {
+        setUsers(response.data)
+      } else {
+        console.error("getAllUsers did not return an array in the data property.", response);
+        setUsers([]); // Set to empty array to prevent crash
+      }
+    } catch (err) {
+      console.error('Error in loadUsers:', err); // Debugging log
+      setError('Failed to load users')
+    }
+  }
+
+  const handleMakeAdmin = async (userId) => {
+    if (window.confirm('Are you sure you want to make this user an admin?')) {
+      try {
+        await makeUserAdmin(userId)
+        setMessage('User promoted to admin successfully')
+        loadUsers()
+      } catch (err) {
+        setError('Failed to promote user')
+      }
+    }
+  }
+
+  const handleOpenEditUserModal = async (userId) => {
+    try {
+      const response = await getUserById(userId);
+      setEditingUser(response.data);
+      setShowEditUser(true);
+    } catch (err) {
+      setError('Failed to load user details.');
+    }
+  };
+
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    setError('');
+    setMessage('');
+
+    try {
+      await updateUser(editingUser.id, userUpdateData);
+      setMessage('User updated successfully!');
+      setShowEditUser(false);
+      setEditingUser(null);
+      loadUsers();
+    } catch (err) {
+      setError('Failed to update user');
+    }
+  };
+
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setError('');
+    setMessage('');
+
+    try {
+      if (editingProfile) {
+        await updateProfile(editingProfile.id, profileData);
+        setMessage('Profile updated successfully!');
+      } else {
+        // Auto-assign profile number
+        const profiles = editingUser.profiles || [];
+        const maxProfileNumber = profiles.length > 0 ? Math.max(...profiles.map(p => Number(p.profileNumber) || 0)) : 0;
+        const newProfile = {
+          ...profileData,
+          profileNumber: maxProfileNumber + 1
+        };
+        await createProfile(editingUser.id, newProfile);
+        setMessage('Profile created successfully!');
+      }
+      setEditingProfile(null);
+      setProfileData({ fullName: '', profileNumber: '' });
+      // Refresh the user data in the modal
+      const response = await getUserById(editingUser.id);
+      setEditingUser(response.data);
+    } catch (err) {
+      console.error('Profile save error:', err);
+      let errorMsg = 'Failed to save profile.';
+      const backendMsg = err?.response?.data?.message || err?.response?.data?.error || '';
+      if ((err.response && err.response.status === 400 && typeof backendMsg === 'string' && backendMsg.toLowerCase().includes('full name')) ||
+          (typeof err.message === 'string' && err.message.toLowerCase().includes('full name'))) {
+        errorMsg = 'A profile with this full name already exists. Please choose a different name.';
+      } else if (backendMsg) {
+        errorMsg = backendMsg;
+      }
+      window.alert(errorMsg);
+      setError('');
+    }
+  };
+
+  const handleDeleteProfile = async (profileId) => {
+    if (window.confirm('Are you sure you want to delete this profile?')) {
+      try {
+        await deleteProfile(profileId);
+        setMessage('Profile deleted successfully!');
+        // Refresh the user data in the modal
+        const response = await getUserById(editingUser.id);
+        setEditingUser(response.data);
+      } catch (err) {
+        setError('Failed to delete profile.');
+      }
+    }
+  };
+
+  const handlePaymentInfoSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setError('');
+    setMessage('');
+
+    try {
+      if (editingPaymentInfo) {
+        await updatePaymentInfo(editingPaymentInfo.id, paymentInfoData);
+        setMessage('Payment info updated successfully!');
+      } else {
+        await createPaymentInfo(editingUser.id, paymentInfoData);
+        setMessage('Payment info created successfully!');
+      }
+      setEditingPaymentInfo(null);
+      setPaymentInfoData({ paymentMethod: 'Venmo', accountIdentifier: '', isPrimary: true });
+      // Refresh the user data in the modal
+      const response = await getUserById(editingUser.id);
+      setEditingUser(response.data);
+    } catch (err) {
+      setError('Failed to save payment info.');
+    }
+  };
+
+  const handleDeletePaymentInfo = async (paymentInfoId) => {
+    if (window.confirm('Are you sure you want to delete this payment method?')) {
+      try {
+        await deletePaymentInfo(paymentInfoId);
+        setMessage('Payment method deleted successfully!');
+        // Refresh the user data in the modal
+        const response = await getUserById(editingUser.id);
+        setEditingUser(response.data);
+      } catch (err) {
+        setError('Failed to delete payment method.');
+      }
+    }
+  };
+
 
   const handleCreatePool = async (e) => {
     e.preventDefault()
     setError('')
     setMessage('')
 
+    // Step 1: Log the raw input
+    console.log('[DEBUG] handleCreatePool: raw newPool:', newPool);
+
+    // Step 2: Prepare payload
+    const payload = {
+      poolName: newPool.poolName,
+      betAmount: newPool.betAmount === '' ? null : newPool.betAmount.toString()
+    };
+    console.log('[DEBUG] handleCreatePool: payload to send:', payload, 'Types:', {
+      poolName: typeof payload.poolName,
+      betAmount: typeof payload.betAmount
+    });
+
     try {
-      await createPool({
-        ...newPool,
-        betAmount: parseFloat(newPool.betAmount),
-      })
+      // Step 3: Send request
+      const response = await createPool(payload);
+      console.log('[DEBUG] handleCreatePool: response:', response);
       setMessage('Pool created successfully!')
       setShowCreatePool(false)
       setNewPool({
@@ -59,7 +336,14 @@ function Admin() {
       })
       loadPools()
     } catch (err) {
-      setError('Failed to create pool')
+      // Step 4: Log error details
+      console.error('[DEBUG] handleCreatePool: error:', err);
+      if (err.response) {
+        console.error('[DEBUG] handleCreatePool: error.response.data:', err.response.data);
+        setError(err.response.data?.message || JSON.stringify(err.response.data) || 'Failed to create pool');
+      } else {
+        setError('Failed to create pool: ' + err.message);
+      }
     }
   }
 
@@ -91,22 +375,11 @@ function Admin() {
     setMessage('')
 
     try {
-      const response = await fetch(`/admin/pools/${editPool.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('superbowl_token')}`
-        },
-        body: JSON.stringify({
-          poolName: editPool.poolName,
-          betAmount: parseFloat(editPool.betAmount),
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to update pool')
-      }
-
+      // Use the updatePool function from squaresService.js
+      await updatePool(editPool.id, {
+        poolName: editPool.poolName,
+        betAmount: parseFloat(editPool.betAmount),
+      });
       setMessage('Pool updated successfully!')
       setShowEditPool(false)
       loadPools()
@@ -119,12 +392,26 @@ function Admin() {
     <div className="container">
       <h1>Admin Panel</h1>
 
+
       <div className="tabs">
+        {/* Edit Squares tab removed, editable grid is now in Edit Pool modal */}
         <button
           className={`tab-btn ${activeTab === 'pools' ? 'active' : ''}`}
-          onClick={() => setActiveTab('pools')}
+          onClick={() => {
+            setActiveTab('pools');
+            setShowEditUser(false);
+          }}
         >
           Manage Pools
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('users');
+            setShowEditPool(false);
+          }}
+        >
+          Manage Users
         </button>
       </div>
 
@@ -156,7 +443,7 @@ function Admin() {
                 </tr>
               </thead>
               <tbody>
-                {pools.map(pool => (
+                {Array.isArray(pools) && pools.map(pool => (
                   <tr key={pool.id}>
                     <td>{pool.poolName}</td>
                     <td>${pool.betAmount}</td>
@@ -198,6 +485,190 @@ function Admin() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'users' && (
+        <div className="card">
+          <h2>Users</h2>
+          <div className="table-container">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Is Admin?</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.isArray(users) && users.map((user, idx) => (
+                  <tr key={user.id ?? idx}>
+                    <td>{user.email}</td>
+                    <td>{user.isAdmin ? 'Yes' : 'No'}</td>
+                    <td>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => handleOpenEditUserModal(user.id)}
+                      >
+                        Manage
+                      </button>
+                      {!user.isAdmin && (
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleMakeAdmin(user.id)}
+                          style={{ marginLeft: '10px' }}
+                        >
+                          Make Admin
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {showEditUser && editingUser && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Edit User: {editingUser.email}</h2>
+
+            <div className="modal-tabs">
+              <button className={`tab-button ${activeModalTab === 'details' ? 'active' : ''}`} onClick={() => setActiveModalTab('details')}>User Details</button>
+              <button className={`tab-button ${activeModalTab === 'profiles' ? 'active' : ''}`} onClick={() => setActiveModalTab('profiles')}>Profiles</button>
+              <button className={`tab-button ${activeModalTab === 'payment' ? 'active' : ''}`} onClick={() => setActiveModalTab('payment')}>Payment</button>
+            </div>
+
+            {activeModalTab === 'details' && (
+              <form onSubmit={handleUpdateUser}>
+                <div className="form-group">
+                  <label>Email:</label>
+                  <input
+                    type="email"
+                    value={userUpdateData.email}
+                    onChange={(e) => setUserUpdateData({ ...userUpdateData, email: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>New Password:</label>
+                  <input
+                    type="password"
+                    placeholder="Leave blank to keep current password"
+                    value={userUpdateData.password}
+                    onChange={(e) => setUserUpdateData({ ...userUpdateData, password: e.target.value })}
+                  />
+                </div>
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary">
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {activeModalTab === 'profiles' && (
+              <div className="user-details-section">
+                <h3>Profiles</h3>
+                {console.log('DEBUG editingUser:', editingUser)}
+                <table className="sub-table">
+                  <thead>
+                    <tr>
+                      <th>Full Name</th>
+                      <th>Profile Number</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editingUser?.profiles?.map((p, idx) => (
+                      <tr key={p.id ?? idx}>
+                        <td>{p.fullName}</td>
+                        <td>{p.profileNumber}</td>
+                        <td>
+                          <button className="btn btn-secondary btn-sm" onClick={() => { setEditingProfile(p); setProfileData(p); }}>Edit</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDeleteProfile(p.id)}>Delete</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <form onSubmit={handleProfileSubmit} className="sub-form">
+                  <h4>{editingProfile ? 'Edit Profile' : 'Add New Profile'}</h4>
+                  <div className="form-group">
+                    <input type="text" placeholder="Full Name" value={profileData.fullName} onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })} required />
+                  </div>
+                  <button type="submit" className="btn btn-primary">{editingProfile ? 'Update Profile' : 'Add Profile'}</button>
+                  {editingProfile && <button type="button" className="btn btn-secondary" onClick={() => { setEditingProfile(null); setProfileData({ fullName: '', profileNumber: '' }); }}>Cancel Edit</button>}
+                </form>
+              </div>
+            )}
+
+            {activeModalTab === 'payment' && (
+              <div className="user-details-section">
+                <h3>Payment Methods</h3>
+                <table className="sub-table">
+                  <thead>
+                    <tr>
+                      <th>Method</th>
+                      <th>Identifier</th>
+                      <th>Primary</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editingUser?.paymentInfos?.map((p, idx) => (
+                      <tr key={p.id ?? idx}>
+                        <td>{p.paymentMethod}</td>
+                        <td>{p.accountIdentifier}</td>
+                        <td>{p.isPrimary ? 'Yes' : 'No'}</td>
+                        <td>
+                          <button className="btn btn-secondary btn-sm" onClick={() => { setEditingPaymentInfo(p); setPaymentInfoData(p); }}>Edit</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDeletePaymentInfo(p.id)}>Delete</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <form onSubmit={handlePaymentInfoSubmit} className="sub-form">
+                  <h4>{editingPaymentInfo ? 'Edit Payment Method' : 'Add New Payment Method'}</h4>
+                  <div className="form-group">
+                    <select value={paymentInfoData.paymentMethod} onChange={(e) => setPaymentInfoData({ ...paymentInfoData, paymentMethod: e.target.value })}>
+                      <option value="Venmo">Venmo</option>
+                      <option value="CashApp">CashApp</option>
+                      <option value="Zelle">Zelle</option>
+                      <option value="PayPal">PayPal</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <input type="text" placeholder="Account Identifier (e.g., @username, email)" value={paymentInfoData.accountIdentifier} onChange={(e) => setPaymentInfoData({ ...paymentInfoData, accountIdentifier: e.target.value })} required />
+                  </div>
+                  <div className="form-group">
+                    <label>
+                      <input type="checkbox" checked={paymentInfoData.isPrimary} onChange={(e) => setPaymentInfoData({ ...paymentInfoData, isPrimary: e.target.checked })} />
+                      Set as Primary
+                    </label>
+                  </div>
+                  <button type="submit" className="btn btn-primary">{editingPaymentInfo ? 'Update Method' : 'Add Method'}</button>
+                  {editingPaymentInfo && <button type="button" className="btn btn-secondary" onClick={() => { setEditingPaymentInfo(null); setPaymentInfoData({ paymentMethod: 'Venmo', accountIdentifier: '', isPrimary: true }); }}>Cancel Edit</button>}
+                </form>
+              </div>
+            )}
+
+            <div className="form-actions">
+               <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowEditUser(false);
+                    setEditingUser(null);
+                  }}
+                >
+                  Close
+                </button>
+            </div>
           </div>
         </div>
       )}
@@ -254,48 +725,214 @@ function Admin() {
 
       {showEditPool && (
         <div className="modal-overlay">
-          <div
-            className="modal-content"
-          >
+          <div className="modal-content" style={{ maxWidth: 'fit-content', width: 'fit-content', minWidth: 0 }}>
             <h2>Edit Pool</h2>
-            <form onSubmit={handleEditPool}>
-                  <div className="form-group">
-                    <label>Pool Name:</label>
-                    <input
-                      type="text"
-                      value={editPool.poolName}
-                      onChange={(e) => setEditPool({ ...editPool, poolName: e.target.value })}
-                      required
-                    />
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 32, marginTop: 0 }}>
+              <form onSubmit={handleEditPool} style={{ minWidth: 320, maxWidth: 400 }}>
+                <div className="form-group">
+                  <label>Pool Name:</label>
+                  <input
+                    type="text"
+                    value={editPool.poolName}
+                    onChange={(e) => setEditPool({ ...editPool, poolName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Bet Amount:</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editPool.betAmount}
+                    onChange={(e) => setEditPool({ ...editPool, betAmount: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary">
+                    Save Changes
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setShowEditPool(false)
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+              <div style={{ flex: 1, minWidth: 0, maxWidth: 'fit-content' }}>
+                <h3>Edit Squares for this Pool</h3>
+                <div className="grid-wrapper">
+                  <div className="grid-container">
+                    {/* Score rows - 4 rows showing AFC numbers with quarter labels on left */}
+                    <div className="score-rows-container">
+                      {['Q1', 'Q2', 'Q3', 'FINAL'].map((quarter, qIdx) => {
+                        const quarterColors = ['#ffeb3b', '#ff9800', '#4caf50', '#00bcd4']
+                        const quarterLabels = ['1Q', '1H', '3Q', 'FS']
+                        // Use AFC numbers from editPool, fallback to 0-9
+                        // Use AFC scores from sheet if available, else fallback
+                        let afcRow = (afcScores && Array.isArray(afcScores) && afcScores[qIdx]) ? afcScores[qIdx] : (editPool.afcNumbers ? editPool.afcNumbers.split(',').map(n => n.trim()) : [0,1,2,3,4,5,6,7,8,9]);
+                        return (
+                          <div key={quarter} style={{ display: 'flex', marginBottom: '2px' }}>
+                            {/* Empty spacing cells before label (qIdx cells) */}
+                            {Array.from({ length: qIdx }).map((_, i) => (
+                              <div
+                                key={`space-before-${qIdx}-${i}`}
+                                style={{
+                                  width: '40px',
+                                  height: '32px',
+                                  border: '1px solid #333',
+                                  backgroundColor: ['#ffeb3b', '#ff9800', '#4caf50'][i] || quarterColors[qIdx],
+                                  boxSizing: 'border-box',
+                                  margin: 0,
+                                  padding: 0,
+                                }}
+                              />
+                            ))}
+                            <div
+                              style={{
+                                width: '40px',
+                                height: '32px',
+                                border: '1px solid #333',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 'bold',
+                                backgroundColor: quarterColors[qIdx],
+                                fontSize: '14px',
+                                boxSizing: 'border-box',
+                                margin: 0,
+                                padding: 0,
+                              }}
+                            >
+                              {quarterLabels[qIdx]}
+                            </div>
+                            {/* Empty spacing cells after label (3 - qIdx cells) */}
+                            {Array.from({ length: 3 - qIdx }).map((_, i) => (
+                              <div
+                                key={`space-after-${qIdx}-${i}`}
+                                style={{
+                                  width: '40px',
+                                  height: '32px',
+                                  border: '1px solid #333',
+                                  backgroundColor: quarterColors[qIdx],
+                                  boxSizing: 'border-box',
+                                  margin: 0,
+                                  padding: 0,
+                                }}
+                              />
+                            ))}
+                            {(afcRow && afcRow.length === 10 ? afcRow : [0,1,2,3,4,5,6,7,8,9]).map((num, colIdx) => (
+                              <div 
+                                key={`${quarter}-afc-${colIdx}`}
+                                style={{
+                                  width: '80px',
+                                  height: '32px',
+                                  border: '1px solid #333',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 'bold',
+                                  backgroundColor: quarterColors[qIdx],
+                                  fontSize: '16px',
+                                  textAlign: 'center',
+                                }}
+                              >
+                                {num}
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {/* Main grid area with NFC score columns on left */}
+                    <div className="main-grid-area">
+                      {/* 10x10 Grid of squares with NFC numbers on left */}
+                      <div className="squares-grid">
+                        {/* Use NFC numbers from editPool, fallback to 0-9 for 4 columns */}
+                        {Array.from({ length: 10 }).map((_, row) => {
+                          const quarterColors = ['#ffeb3b', '#ff9800', '#4caf50', '#00bcd4']
+                          // Use NFC scores from sheet if available, else fallback
+                          let nfcRow = (nfcScores && Array.isArray(nfcScores) && nfcScores[row]) ? nfcScores[row] : (editPool.nfcNumbers ? Array(4).fill(editPool.nfcNumbers.split(',').map(n => n.trim())[row] ?? row) : Array(4).fill(row));
+                          return (
+                            <div key={`row-${row}`} className="grid-row-wrapper">
+                              {/* NFC Score Columns - one number per row for each quarter */}
+                              <div className="nfc-score-columns">
+                                {nfcRow.map((nfcNum, qIdx) => (
+                                  <div 
+                                    key={`nfc-col-${qIdx}-row-${row}`}
+                                    style={{
+                                      width: '40px',
+                                      height: '60px',
+                                      border: '1px solid #333',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontWeight: 'bold',
+                                      backgroundColor: quarterColors[qIdx],
+                                      fontSize: '16px',
+                                      boxSizing: 'border-box',
+                                      margin: 0,
+                                      padding: 0,
+                                    }}
+                                  >
+                                    {nfcNum}
+                                  </div>
+                                ))}
+                              </div>
+                              {/* Grid squares for this row */}
+                              <div className="grid-row">
+                                {Array.from({ length: 10 }).map((_, col) => {
+                                  const square = editSquares.find(sq => sq.rowPosition === row && sq.colPosition === col) || {};
+                                  return (
+                                    <div
+                                      key={`square-${row}-${col}`}
+                                      className={`grid-square ${(square?.profile && square?.profile?.id) ? 'claimed' : 'available'}`}
+                                      title={square?.profileName || 'Available'}
+                                      style={{ cursor: 'pointer' }}
+                                      onClick={() => handleAdminSquareClick(square)}
+                                    >
+                                      {square?.profileName || ''}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="form-group">
-                    <label>Bet Amount:</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={editPool.betAmount}
-                      onChange={(e) => setEditPool({ ...editPool, betAmount: e.target.value })}
-                      required
-                    />
-                  </div>
-
-              <div className="form-actions">
-                <button type="submit" className="btn btn-primary">
-                  Save Changes
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setShowEditPool(false)
-                  }}
-                >
-                  Cancel
-                </button>
+                </div>
               </div>
-            </form>
+            </div>
           </div>
+          {/* Edit Square Modal (should be outside flex row) */}
+          {showEditSquareModal && (
+            <div className="modal-overlay">
+              <div className="modal-content">
+                <h3>Edit Square</h3>
+                <p>Row: {selectedSquare?.rowPosition}, Col: {selectedSquare?.colPosition}</p>
+                <div className="form-group">
+                  <label>Assign Profile:</label>
+                  <select value={selectedProfileId} onChange={e => setSelectedProfileId(e.target.value)}>
+                    <option value="">-- Unassigned --</option>
+                    {allProfiles.map(profile => (
+                      <option key={profile.id} value={profile.id}>{profile.fullName} ({profile.userEmail})</option>
+                    ))}
+                  </select>
+                </div>
+                {editSquaresError && <div className="error">{editSquaresError}</div>}
+                <div className="form-actions">
+                  <button className="btn btn-primary" onClick={handleAdminAssignProfile}>Save</button>
+                  <button className="btn btn-secondary" onClick={() => setShowEditSquareModal(false)}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

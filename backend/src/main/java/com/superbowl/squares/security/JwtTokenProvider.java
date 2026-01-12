@@ -30,12 +30,12 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + jwtExpiration);
 
         return Jwts.builder()
-                .subject(email)
-                .issuedAt(now)
-                .expiration(expiryDate)
-                .claim("authorities", authentication.getAuthorities())
-                .signWith(getSigningKey())
-                .compact();
+            .subject(email)
+            .issuedAt(now)
+            .expiration(expiryDate)
+            .claim("authorities", authentication.getAuthorities())
+            .signWith(getSigningKey(), SignatureAlgorithm.HS512)
+            .compact();
     }
 
     public String getEmailFromToken(String token) {

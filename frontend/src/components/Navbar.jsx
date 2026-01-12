@@ -1,6 +1,11 @@
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext.jsx'
 
-function Navbar({ isAuthenticated, isAdmin, onLogout }) {
+function Navbar() {
+  const { isAuthenticated, isAdmin, logout } = useAuth();
+
+  console.log('Navbar rendering. IsAuthenticated:', isAuthenticated, 'IsAdmin:', isAdmin);
+
   return (
     <nav className="navbar">
       <div className="navbar-brand">
@@ -17,7 +22,7 @@ function Navbar({ isAuthenticated, isAdmin, onLogout }) {
         ) : (
           <li>
             <button 
-              onClick={onLogout} 
+              onClick={logout} 
               className="btn btn-secondary"
               style={{ padding: '5px 15px' }}
             >

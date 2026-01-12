@@ -4,6 +4,9 @@ import com.superbowl.squares.dto.ClaimSquareRequest;
 import com.superbowl.squares.model.Square;
 import com.superbowl.squares.service.SquareService;
 import jakarta.validation.Valid;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,15 +16,21 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/squares")
+@RequestMapping("/api/squares")
 public class SquareController {
+
+    private static final Logger logger = LoggerFactory.getLogger(SquareController.class);
 
     @Autowired
     private SquareService squareService;
 
+
     @GetMapping("/pool/{poolId}")
     public ResponseEntity<List<Square>> getSquaresByPool(@PathVariable Long poolId) {
-        return ResponseEntity.ok(squareService.getSquaresByPool(poolId));
+        logger.info("[getSquaresByPool] poolId received: {}", poolId);
+        List<Square> squares = squareService.getSquaresByPool(poolId);
+        logger.info("[getSquaresByPool] squares found: {}", squares.size());
+        return ResponseEntity.ok(squares);
     }
 
     @PostMapping("/claim")
@@ -39,11 +48,15 @@ public class SquareController {
         return ResponseEntity.ok(square);
     }
 
+
     @GetMapping("/pool/{poolId}/stats")
     public ResponseEntity<Map<String, Object>> getPoolStats(@PathVariable Long poolId) {
+        logger.info("[getPoolStats] poolId received: {}", poolId);
+        long claimedCount = squareService.getClaimedCount(poolId);
+        logger.info("[getPoolStats] claimedCount: {}", claimedCount);
         Map<String, Object> stats = new HashMap<>();
-        stats.put("claimedCount", squareService.getClaimedCount(poolId));
-        stats.put("availableCount", 100 - squareService.getClaimedCount(poolId));
+        stats.put("claimedCount", claimedCount);
+        stats.put("availableCount", 100 - claimedCount);
         return ResponseEntity.ok(stats);
     }
 }

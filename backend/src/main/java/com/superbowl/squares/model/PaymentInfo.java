@@ -17,8 +17,10 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class PaymentInfo {
 
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @com.fasterxml.jackson.annotation.JsonView(com.superbowl.squares.view.View.Detail.class)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -28,20 +30,25 @@ public class PaymentInfo {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonView(com.superbowl.squares.view.View.Detail.class)
     private PaymentMethod paymentMethod;
 
     @Column(name = "account_identifier", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonView(com.superbowl.squares.view.View.Detail.class)
     private String accountIdentifier;
 
     @Column(name = "is_primary", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonView(com.superbowl.squares.view.View.Detail.class)
     private Boolean isPrimary = true;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
+    @com.fasterxml.jackson.annotation.JsonView(com.superbowl.squares.view.View.Detail.class)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at")
+    @com.fasterxml.jackson.annotation.JsonView(com.superbowl.squares.view.View.Detail.class)
     private LocalDateTime updatedAt;
 
     public enum PaymentMethod {

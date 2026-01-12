@@ -65,9 +65,10 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**", "/health", "/pools/active", "/squares/**", "/scores/**").permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated()
+                    .requestMatchers("/auth/**", "/api/auth/**", "/health", "/pools/active", "/api/pools/active", "/squares/**", "/scores/**").permitAll()
+                    .requestMatchers("/api/sheets/**").permitAll()
+                    .requestMatchers("/admin/**", "/api/admin/**").hasRole("ADMIN")
+                    .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

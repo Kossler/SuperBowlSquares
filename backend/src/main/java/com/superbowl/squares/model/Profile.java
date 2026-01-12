@@ -22,6 +22,7 @@ public class Profile {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @com.fasterxml.jackson.annotation.JsonView(com.superbowl.squares.view.View.Detail.class)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -30,12 +31,15 @@ public class Profile {
     private User user;
 
     @Column(name = "full_name", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonView(com.superbowl.squares.view.View.Detail.class)
     private String fullName;
 
     @Column(name = "profile_number", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonView(com.superbowl.squares.view.View.Detail.class)
     private Integer profileNumber;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
+    @com.fasterxml.jackson.annotation.JsonView(com.superbowl.squares.view.View.Detail.class)
     private LocalDateTime createdAt;
 }

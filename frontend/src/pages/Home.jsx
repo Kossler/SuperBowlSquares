@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getActivePools, getSquaresByPool } from '../services/squaresService'
+import { getActivePools, getSquaresByPool, getAfcScoresFromSheet, getNfcScoresFromSheet } from '../services/squaresService'
 import './Home.css'
 
 function Home() {
@@ -7,10 +7,31 @@ function Home() {
   const [selectedPool, setSelectedPool] = useState(null)
   const [squares, setSquares] = useState([])
   const [loading, setLoading] = useState(true)
+  const [afcScores, setAfcScores] = useState(null)
+  const [nfcScores, setNfcScores] = useState(null)
 
   useEffect(() => {
     loadData()
   }, [])
+
+  // Fetch AFC and NFC scores from backend when pool changes
+  useEffect(() => {
+    const fetchScores = async () => {
+      if (!selectedPool) return;
+      try {
+        const spreadsheetId = '1zXue8QE0GBV5GRWv7k5JSR67yRjMf3o7Cj9egY4Fguk';
+        const sheetName = selectedPool.poolName || 'Sheet1';
+        const afc = await getAfcScoresFromSheet(spreadsheetId, sheetName);
+        setAfcScores(afc);
+        const nfc = await getNfcScoresFromSheet(spreadsheetId, sheetName);
+        setNfcScores(nfc);
+      } catch (err) {
+        setAfcScores(null);
+        setNfcScores(null);
+      }
+    };
+    fetchScores();
+  }, [selectedPool]);
 
   useEffect(() => {
     if (selectedPool) {
@@ -55,18 +76,38 @@ function Home() {
     return squares.find(s => s.rowPosition === row && s.colPosition === col)
   }
 
-  const getAfcNumbers = () => {
-    if (selectedPool?.afcNumbers) {
-      return selectedPool.afcNumbers.split(',').map(n => n.trim())
+  // Returns all AFC rows for colored rows, and first row for grid columns
+  const getAfcRows = () => {
+    if (afcScores && Array.isArray(afcScores) && afcScores.length > 0) {
+      return afcScores;
     }
-    return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    if (selectedPool?.afcNumbers) {
+      return [selectedPool.afcNumbers.split(',').map(n => n.trim())];
+    }
+    return [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]];
   }
 
-  const getNfcNumbers = () => {
-    if (selectedPool?.nfcNumbers) {
-      return selectedPool.nfcNumbers.split(',').map(n => n.trim())
+  // For grid columns, always use first row
+  const getAfcGridNumbers = () => {
+    const rows = getAfcRows();
+    return rows[0] || [0,1,2,3,4,5,6,7,8,9];
+  }
+
+  // For NFC score columns, use backend NFC scores if available
+  // Returns a 10x4 array for A6:D15 (10 rows, 4 columns)
+  const getNfcColumns = () => {
+    if (nfcScores && Array.isArray(nfcScores) && nfcScores.length > 0) {
+      // nfcScores is expected to be a 10x4 array (A6:D15)
+      return nfcScores;
     }
-    return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    // Fallback: single column of numbers
+    if (selectedPool?.nfcNumbers) {
+      // If only a single column, repeat for 4 columns
+      const col = selectedPool.nfcNumbers.split(',').map(n => n.trim());
+      return Array.from({ length: 10 }, (_, i) => Array(4).fill(col[i] || 0));
+    }
+    // Default: 0-9 for 4 columns
+    return Array.from({ length: 10 }, (_, i) => Array(4).fill(i));
   }
 
   if (loading) {
@@ -159,27 +200,25 @@ function Home() {
                           }}
                         />
                       ))}
-                      {getAfcNumbers().map((num, colIdx) => {
-                        return (
-                          <div 
-                            key={`${quarter}-afc-${colIdx}`}
-                            style={{
-                              width: '80px',
-                              height: '32px',
-                              border: '1px solid #333',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 'bold',
-                              backgroundColor: quarterColors[qIdx],
-                              fontSize: '16px',
-                              textAlign: 'center',
-                            }}
-                          >
-                            {num}
-                          </div>
-                        )
-                      })}
+                      {(getAfcRows()[qIdx] || [0,1,2,3,4,5,6,7,8,9]).map((num, colIdx) => (
+                        <div 
+                          key={`${quarter}-afc-${colIdx}`}
+                          style={{
+                            width: '80px',
+                            height: '32px',
+                            border: '1px solid #333',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 'bold',
+                            backgroundColor: quarterColors[qIdx],
+                            fontSize: '16px',
+                            textAlign: 'center',
+                          }}
+                        >
+                          {num}
+                        </div>
+                      ))}
                     </div>
                   )
                 })}
@@ -190,40 +229,37 @@ function Home() {
                 
                 {/* 10x10 Grid of squares with NFC numbers on left */}
                 <div className="squares-grid">
-                  {getNfcNumbers().map((nfcNum, row) => {
+                  {getNfcColumns().map((nfcRow, row) => {
                     const quarterColors = ['#ffeb3b', '#ff9800', '#4caf50', '#00bcd4']
                     return (
                       <div key={`row-${row}`} className="grid-row-wrapper">
                         {/* NFC Score Columns - one number per row for each quarter */}
                         <div className="nfc-score-columns">
-                          {['Q1', 'Q2', 'Q3', 'FINAL'].map((quarter, qIdx) => {
-                            return (
-                              <div 
-                                key={`${quarter}-nfc-${row}`}
-                                style={{
-                                  width: '40px',
-                                  height: '60px',
-                                  border: '1px solid #333',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontWeight: 'bold',
-                                  backgroundColor: quarterColors[qIdx],
-                                  fontSize: '16px',
-                                  boxSizing: 'border-box',
-                                  margin: 0,
-                                  padding: 0,
-                                }}
-                              >
-                                {nfcNum}
-                              </div>
-                            )
-                          })}
+                          {nfcRow.map((nfcNum, qIdx) => (
+                            <div 
+                              key={`nfc-col-${qIdx}-row-${row}`}
+                              style={{
+                                width: '40px',
+                                height: '60px',
+                                border: '1px solid #333',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 'bold',
+                                backgroundColor: quarterColors[qIdx],
+                                fontSize: '16px',
+                                boxSizing: 'border-box',
+                                margin: 0,
+                                padding: 0,
+                              }}
+                            >
+                              {nfcNum}
+                            </div>
+                          ))}
                         </div>
-                      
                       {/* Grid squares for this row */}
                       <div className="grid-row">
-                        {getAfcNumbers().map((afcNum, col) => {
+                        {getAfcGridNumbers().map((afcNum, col) => {
                           const square = getSquareByPosition(row, col)
                           return (
                             <div

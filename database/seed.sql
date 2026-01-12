@@ -6,11 +6,6 @@ DELETE FROM squares;
 DELETE FROM pools;
 DELETE FROM users;
 
--- Create default admin user (password: Admin123!)
--- Password hash is bcrypt for 'Admin123!'
-INSERT INTO users (email, password_hash, is_admin) VALUES
-('admin@superbowlsquares.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', TRUE);
-
 -- Create sample pools
 INSERT INTO pools (pool_name, bet_amount) VALUES
 ('5A', 5.00),

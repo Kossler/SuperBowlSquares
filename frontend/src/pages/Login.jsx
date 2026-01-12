@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { login, signup } from '../services/squaresService'
+import { login as loginService, signup as signupService } from '../services/squaresService'
+import { useAuth } from '../context/AuthContext.jsx'
 import './Login.css'
 
-function Login({ onLogin }) {
+function Login() {
   const navigate = useNavigate()
+  const { login } = useAuth();
   const [isSignup, setIsSignup] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,8 +22,8 @@ function Login({ onLogin }) {
     setLoading(true)
 
     try {
-      const response = await login(email, password)
-      onLogin(response.token, response.isAdmin)
+      const response = await loginService(email, password)
+      login(response)
       navigate('/')
     } catch (err) {
       setError('Invalid email or password')
@@ -57,11 +59,20 @@ function Login({ onLogin }) {
         },
       }
 
-      const response = await signup(signupData)
-      onLogin(response.token, response.isAdmin)
+      const response = await signupService(signupData)
+      login(response)
       navigate('/')
     } catch (err) {
-      setError('Failed to create account. Email may already exist.')
+      let backendMsg = err?.response?.data?.message || err?.response?.data?.error || '';
+      if (backendMsg.toLowerCase().includes('full name')) {
+        setError('A profile with this full name already exists. Please choose a different name.');
+      } else if (backendMsg.toLowerCase().includes('email already exists')) {
+        setError('Email already exists. Please use a different email.');
+      } else if (backendMsg) {
+        setError(backendMsg);
+      } else {
+        setError('Failed to create account.');
+      }
     } finally {
       setLoading(false)
     }

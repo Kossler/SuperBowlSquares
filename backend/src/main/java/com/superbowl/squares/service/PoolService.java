@@ -24,6 +24,7 @@ public class PoolService {
         return poolRepository.findByIsActiveTrue();
     }
 
+    @SuppressWarnings("null")
     public Pool getPoolById(Long id) {
         return poolRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Pool not found"));
