@@ -1,3 +1,5 @@
+# Google Service Account Key (never commit)
+backend/credentials/service-account.json
 # Compiled class file
 *.class
 

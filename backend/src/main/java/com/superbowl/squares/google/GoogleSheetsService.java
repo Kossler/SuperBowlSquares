@@ -1,38 +1,56 @@
 package com.superbowl.squares.google;
 
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.client.util.store.FileDataStoreFactory;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.*;
-import org.springframework.stereotype.Service;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.IOException;
-
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
 @Service
 public class GoogleSheetsService {
+
+    private static final String APPLICATION_NAME = "SuperBowlSquares";
+    private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
+    private static final List<String> SCOPES = Collections.singletonList(SheetsScopes.SPREADSHEETS);
+
+    // Cache the Sheets client (building it requires I/O + crypto + transport setup).
+    private volatile Sheets sheetsService;
+
+    // Cache sheetId lookups to avoid an extra API call for each update.
+    // Key format: "<spreadsheetId>|<sheetName>" -> sheetId
+    private final ConcurrentMap<String, Integer> sheetIdCache = new ConcurrentHashMap<>();
+
+    // Reuse HTTP transport (expensive to create; safe to reuse).
+    private final NetHttpTransport httpTransport;
+
+    public GoogleSheetsService() {
+        try {
+            this.httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+        } catch (GeneralSecurityException | IOException e) {
+            throw new IllegalStateException("Failed to initialize Google HTTP transport", e);
+        }
+    }
 
         // Appends a new owner row to the Owners sheet: [email, password, profiles..., payment method, identifier]
         public void appendOwnerRow(String spreadsheetId, String sheetName, String email, String password, List<String> profileNames, String paymentMethod, String identifier) throws Exception {
             Sheets service = getSheetsService();
             // Prepare row: A=email, B=password, C:L=profiles (up to 10), M=payment method, N=identifier
-            List<Object> row = new java.util.ArrayList<>();
+            List<Object> row = new ArrayList<>();
             row.add(email);
             row.add(password);
             if (profileNames != null) {
@@ -49,13 +67,13 @@ public class GoogleSheetsService {
             ValueRange body = new ValueRange().setValues(values);
             service.spreadsheets().values().append(spreadsheetId, sheetName + "!A:N", body)
                 .setValueInputOption("RAW").setInsertDataOption("INSERT_ROWS").execute();
-            logger.info("Appended owner row to sheet {}: {}", sheetName, row);
+            logger.debug("Appended owner row to sheet {}", sheetName);
         }
     private static final Logger logger = LoggerFactory.getLogger(GoogleSheetsService.class);
 
     // Update a single cell using row/col (0,0 = F6)
     public void updateCell(String spreadsheetId, String sheetName, int row, int col, String value) throws Exception {
-        logger.info("Updating single cell (preserving formatting): spreadsheetId={}, sheetName={}, row={}, col={}, value={}", spreadsheetId, sheetName, row, col, value);
+        logger.debug("Updating single cell: spreadsheetId={}, sheetName={}, row={}, col={}", spreadsheetId, sheetName, row, col);
         Sheets service = getSheetsService();
 
         // Get the sheetId (not the name) for batchUpdate
@@ -83,7 +101,7 @@ public class GoogleSheetsService {
             com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest batchRequest = new com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest()
             .setRequests(Collections.singletonList(clearRequest));
             service.spreadsheets().batchUpdate(spreadsheetId, batchRequest).execute();
-            logger.info("Cell cleared in Google Sheets API.");
+            logger.debug("Cell cleared in Google Sheets API.");
         } else {
             com.google.api.services.sheets.v4.model.CellData cellData = new com.google.api.services.sheets.v4.model.CellData()
             .setUserEnteredValue(new com.google.api.services.sheets.v4.model.ExtendedValue().setStringValue(value));
@@ -96,18 +114,28 @@ public class GoogleSheetsService {
                 new com.google.api.services.sheets.v4.model.Request().setRepeatCell(repeatCellRequest)
             ));
             service.spreadsheets().batchUpdate(spreadsheetId, batchRequest).execute();
-            logger.info("Single cell batchUpdate request sent to Google Sheets API (formatting preserved).");
+            logger.debug("Single cell batchUpdate request sent to Google Sheets API (formatting preserved).");
         }
     }
 
     // Helper to get sheetId from sheet name
     private Integer getSheetId(Sheets service, String spreadsheetId, String sheetName) throws Exception {
+        String cacheKey = spreadsheetId + "|" + sheetName;
+        Integer cached = sheetIdCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
         Sheets.Spreadsheets.Get request = service.spreadsheets().get(spreadsheetId);
         request.setFields("sheets.properties");
         Spreadsheet ss = request.execute();
         for (Sheet s : ss.getSheets()) {
             if (sheetName.equals(s.getProperties().getTitle())) {
-                return s.getProperties().getSheetId();
+                Integer sheetId = s.getProperties().getSheetId();
+                if (sheetId != null) {
+                    sheetIdCache.putIfAbsent(cacheKey, sheetId);
+                }
+                return sheetId;
             }
         }
         return null;
@@ -132,31 +160,37 @@ public class GoogleSheetsService {
         }
         return sb.toString();
     }
-    private static final String APPLICATION_NAME = "SuperBowlSquares";
-    private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
-        private static final String CREDENTIALS_RESOURCE_PATH = "google/client_secret_132614767954-oiilm5bdn4o6m2mu6pt5edgm901guhj7.apps.googleusercontent.com.json";
-        private static final String TOKENS_DIRECTORY_PATH = new File(new File(GoogleSheetsService.class.getProtectionDomain().getCodeSource().getLocation().getPath()).getParentFile().getParentFile().getParentFile().getParentFile(), "backend/src/main/resources/google/tokens").getAbsolutePath();
-    private static final List<String> SCOPES = Collections.singletonList(SheetsScopes.SPREADSHEETS);
-
     private Sheets getSheetsService() throws IOException, GeneralSecurityException {
-        final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
-        InputStream in = getClass().getClassLoader().getResourceAsStream(CREDENTIALS_RESOURCE_PATH);
-        if (in == null) {
-            throw new IOException("Resource not found: " + CREDENTIALS_RESOURCE_PATH);
+        Sheets local = sheetsService;
+        if (local != null) {
+            return local;
         }
-        GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(
-                JSON_FACTORY, new InputStreamReader(in));
-        File tokenDir = new File(TOKENS_DIRECTORY_PATH);
-        logger.info("[DEBUG] Using token directory: {} (absolute: {})", TOKENS_DIRECTORY_PATH, tokenDir.getAbsolutePath());
-        GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-                HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
-                .setDataStoreFactory(new FileDataStoreFactory(tokenDir))
-                .setAccessType("offline")
-                .build();
-        var credential = flow.loadCredential("user");
-        return new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
-                .setApplicationName(APPLICATION_NAME)
-                .build();
+
+        synchronized (this) {
+            local = sheetsService;
+            if (local != null) {
+                return local;
+            }
+
+            GoogleCredentials credentials;
+            String jsonEnv = System.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON");
+            if (jsonEnv != null && !jsonEnv.isBlank()) {
+                try (java.io.InputStream is = new java.io.ByteArrayInputStream(jsonEnv.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+                    credentials = GoogleCredentials.fromStream(is).createScoped(SCOPES);
+                }
+            } else {
+                // Local dev fallback
+                String credentialsPath = "backend/credentials/service-account.json";
+                try (java.io.InputStream is = new java.io.FileInputStream(credentialsPath)) {
+                    credentials = GoogleCredentials.fromStream(is).createScoped(SCOPES);
+                }
+            }
+
+            sheetsService = new Sheets.Builder(httpTransport, JSON_FACTORY, new HttpCredentialsAdapter(credentials))
+                    .setApplicationName(APPLICATION_NAME)
+                    .build();
+            return sheetsService;
+        }
     }
 
     // Example: Read values from a sheet/tab by name
@@ -171,16 +205,14 @@ public class GoogleSheetsService {
 
     // Example: Update values in a sheet/tab by name
         public void updateSheet(String spreadsheetId, String sheetName, String range, List<List<Object>> values) throws Exception {
-                logger.info("Updating Google Sheet: spreadsheetId={}, sheetName={}, range={}", spreadsheetId, sheetName, range);
-                logger.info("First row of values: {}", values != null && !values.isEmpty() ? values.get(0) : "<empty>");
+            logger.debug("Updating Google Sheet: spreadsheetId={}, sheetName={}, range={}", spreadsheetId, sheetName, range);
                 Sheets service = getSheetsService();
                 String fullRange = sheetName + "!" + range;
-                logger.info("Full range: {}", fullRange);
                 ValueRange body = new ValueRange().setValues(values);
                 service.spreadsheets().values()
                                 .update(spreadsheetId, fullRange, body)
                                 .setValueInputOption("RAW")
                                 .execute();
-                logger.info("Update request sent to Google Sheets API.");
+            logger.debug("Update request sent to Google Sheets API.");
         }
 }

@@ -1,6 +1,7 @@
 .grid-wrapper {
   overflow-x: auto;
-  margin: 20px 0;
+  display: flex;
+  justify-content: center;
 }
 
 .grid-container {
@@ -66,8 +67,7 @@
 }
 
 .grid-row-wrapper {
-  display: flex;
-  height: 60px;
+  margin: 0;
 }
 
 .nfc-score-columns {
@@ -76,7 +76,8 @@
   width: 160px;
 }
 
-.score-cell.nfc-score {
+.nfc-score-columns > div {
+  margin: 0;
   width: 40px;
   height: 60px;
   border: 1px solid #333;
@@ -114,26 +115,26 @@
 }
 
 .grid-square.available {
-  background-color: #f8f9fa;
+  background-color: #FFFF00;
 }
 
 .grid-square.available:hover {
-  background-color: #e9ecef;
+  background-color: #FFFF00;
   transform: scale(1.05);
 }
 
 .grid-square.claimed {
-  background-color: #d4edda;
+  background-color: #fff;
   cursor: default;
 }
 
 .grid-square.owned {
-  background-color: #cfe2ff;
+  background-color: #ffbbbb ;  
   font-weight: bold;
   cursor: pointer;
 }
 
 .grid-square.owned:hover {
-  background-color: #b6d4ff;
+  background-color: #ffbbbb;
   transform: scale(1.05);
 }

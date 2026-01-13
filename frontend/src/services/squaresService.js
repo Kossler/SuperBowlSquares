@@ -8,23 +8,23 @@ import { setToken, setUser } from '../utils/auth'
 
 // Update a single cell in Google Sheets via backend
 export const updateCellInSheet = async (spreadsheetId, poolName, row, col, value) => {
-  const response = await api.post(`/sheets/${spreadsheetId}/${poolName}/cell?row=${row}&col=${col}&value=${encodeURIComponent(value)}`);
+  const response = await api.post(`/api/sheets/${spreadsheetId}/${poolName}/cell?row=${row}&col=${col}&value=${encodeURIComponent(value)}`);
   return response.data;
 }
 export const getAfcScoresFromSheet = async (spreadsheetId, poolName) => {
-  const response = await api.get(`/sheets/${spreadsheetId}/${poolName}/afc-scores`);
+  const response = await api.get(`/api/sheets/${spreadsheetId}/${poolName}/afc-scores`);
   return response.data;
 }
 export const getNfcScoresFromSheet = async (spreadsheetId, poolName) => {
-  const response = await api.get(`/sheets/${spreadsheetId}/${poolName}/nfc-scores`);
+  const response = await api.get(`/api/sheets/${spreadsheetId}/${poolName}/nfc-scores`);
   return response.data;
 }
 export const syncGridToSheet = async (spreadsheetId, sheetName, gridData) => {
-  const response = await api.post(`/sheets/${spreadsheetId}/${sheetName}/grid`, gridData);
+  const response = await api.post(`/api/sheets/${spreadsheetId}/${sheetName}/grid`, gridData);
   return response.data;
 }
 export const login = async (email, password) => {
-  const response = await api.post('/auth/login', { email, password })
+  const response = await api.post('/api/auth/login', { email, password })
   const { token, ...user } = response.data
   console.log('Login response token:', token)
   setToken(token)
@@ -33,12 +33,12 @@ export const login = async (email, password) => {
 }
 
 export const signup = async (signupData) => {
-  const response = await api.post('/auth/signup', signupData)
+  const response = await api.post('/api/auth/signup', signupData)
   return response.data
 }
 
 export const getMe = async () => {
-  const response = await api.get('/auth/me');
+  const response = await api.get('/api/auth/me');
   return response.data;
 }
 export const getActivePools = async () => {

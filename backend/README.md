@@ -19,10 +19,11 @@
    ```
 
 3. Update database credentials in `src/main/resources/application.properties`:
-   ```properties
-   spring.datasource.username=your_username
-   spring.datasource.password=your_password
-   ```
+   The backend reads DB settings from environment variables (see `src/main/resources/application.properties`):
+
+   - `SPRING_DATASOURCE_URL` (example: `jdbc:mysql://localhost:3306/superbowl_squares`)
+   - `SPRING_DATASOURCE_USERNAME`
+   - `SPRING_DATASOURCE_PASSWORD`
 
 ## Running the Application
 
@@ -86,10 +87,22 @@ java -jar target/squares-1.0.0.jar
 Key configuration options in `application.properties`:
 
 - `server.port` - Server port (default: 8080)
-- `spring.datasource.url` - Database connection URL
-- `jwt.secret` - JWT secret key (change in production!)
+- `spring.datasource.url` - Database connection URL (from `SPRING_DATASOURCE_URL`)
+- `jwt.secret` - JWT secret key (from `JWT_SECRET`, change in production!)
 - `jwt.expiration` - Token expiration time in milliseconds
 - `cors.allowed-origins` - Allowed CORS origins
+
+## Google Sheets (Service Account)
+
+This project uses a Google service account (not OAuth) to access Google Sheets.
+
+Credential options:
+- **Recommended (production):** set `GOOGLE_APPLICATION_CREDENTIALS_JSON` to the full JSON contents of your service account key.
+- **Local dev fallback:** place the key at `backend/credentials/service-account.json` (do not commit).
+
+Important:
+- Ensure the Google Sheets API is enabled for your Google Cloud project.
+- Share the target spreadsheet with the service account email.
 
 ## Troubleshooting
 

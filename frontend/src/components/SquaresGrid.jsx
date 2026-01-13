@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from 'react'
 import { getSquaresByPool, getActivePools, claimSquare, unclaimSquare, getPoolById, syncGridToSheet, getAfcScoresFromSheet, getNfcScoresFromSheet, updateCellInSheet } from '../services/squaresService'
 import { getUser } from '../utils/auth'
 import './SquaresGrid.css'
 
-function SquaresGrid({ poolId, onSquareClaimed }) {
+function SquaresGrid({ poolId, onSquareClaimed, selectedProfileId }) {
   const [squares, setSquares] = useState([])
   const [pool, setPool] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -51,10 +50,14 @@ function SquaresGrid({ poolId, onSquareClaimed }) {
     try {
       const squaresData = await getSquaresByPool(poolId)
       setSquares(squaresData)
-      
-      const poolsData = await getActivePools()
-      const selectedPoolData = poolsData.find(p => p.id === poolId)
-      setPool(selectedPoolData)
+
+      // Avoid re-fetching all pools on every refresh (especially after each click).
+      // Only refresh pool metadata when we don't already have it for this poolId.
+      if (!pool || pool.id !== poolId) {
+        const poolsData = await getActivePools()
+        const selectedPoolData = poolsData.find(p => p.id === poolId)
+        setPool(selectedPoolData)
+      }
       
       setLoading(false)
     } catch (err) {
@@ -71,13 +74,13 @@ function SquaresGrid({ poolId, onSquareClaimed }) {
     if (pool?.afcNumbers) {
       return [pool.afcNumbers.split(',').map(n => n.trim())];
     }
-    return [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]];
+    return [Array(10).fill('')];
   }
 
   // For grid columns, always use first row
   const getAfcGridNumbers = () => {
     const rows = getAfcRows();
-    return rows[0] || [0,1,2,3,4,5,6,7,8,9];
+    return rows[0] || Array(10).fill('');
   }
 
   // For NFC score columns, use backend NFC scores if available
@@ -91,25 +94,75 @@ function SquaresGrid({ poolId, onSquareClaimed }) {
     if (pool?.nfcNumbers) {
       // If only a single column, repeat for 4 columns
       const col = pool.nfcNumbers.split(',').map(n => n.trim());
-      return Array.from({ length: 10 }, (_, i) => Array(4).fill(col[i] || 0));
+      return Array.from({ length: 10 }, (_, i) => Array(4).fill(col[i] || ''));
     }
-    // Default: 0-9 for 4 columns
-    return Array.from({ length: 10 }, (_, i) => Array(4).fill(i));
+    // Default: empty for 4 columns
+    return Array.from({ length: 10 }, () => Array(4).fill(''));
   }
 
-  const handleSquareClick = (square) => {
-    if (square.profile) {
-      // If user owns this square, allow them to remove it
-      if (isOwnedByUser(square)) {
-        setSelectedSquare(square)
-        setShowModal(true)
-        setError('')
+  // New: Only allow editing for selected profile
+  const handleSquareClick = async (square) => {
+    if (!selectedProfileId) return;
+    if (!square) return;
+    setError('');
+
+    const spreadsheetId = '1zXue8QE0GBV5GRWv7k5JSR67yRjMf3o7Cj9egY4Fguk';
+    const sheetName = pool?.poolName || 'Sheet1';
+
+    const selectedProfileNumericId = parseInt(selectedProfileId);
+    const selectedProfileObj = user?.profiles?.find(p => p.id === selectedProfileNumericId);
+    const profileName = selectedProfileObj ? selectedProfileObj.fullName : '';
+
+    const ownedBySelectedProfile = square.profile && square.profile.id === selectedProfileNumericId;
+    const isUnclaimed = !square.profile;
+    const canEdit = isUnclaimed || ownedBySelectedProfile;
+    if (!canEdit) return;
+
+    // Optimistically update UI immediately; do network in background.
+    const previousSquares = squares;
+
+    // If square is claimed by this profile, unclaim on click
+    if (ownedBySelectedProfile) {
+      setSquares(prev => prev.map(s => {
+        if (s.rowPosition !== square.rowPosition || s.colPosition !== square.colPosition) return s;
+        return { ...s, profile: null, profileName: '' };
+      }));
+
+      try {
+        await unclaimSquare(poolId, square.rowPosition, square.colPosition);
+        await updateCellInSheet(spreadsheetId, sheetName, square.rowPosition, square.colPosition, '');
+        if (onSquareClaimed) onSquareClaimed();
+        window.dispatchEvent(new Event('squares-updated'));
+      } catch (err) {
+        setSquares(previousSquares);
+        setError('Failed to update square');
       }
-      return
+      return;
     }
-    setSelectedSquare(square)
-    setShowModal(true)
-    setError('')
+
+    // If square is unclaimed, claim for selected profile
+    if (isUnclaimed) {
+      setSquares(prev => prev.map(s => {
+        if (s.rowPosition !== square.rowPosition || s.colPosition !== square.colPosition) return s;
+        return { ...s, profile: { id: selectedProfileNumericId }, profileName };
+      }));
+
+      try {
+        await claimSquare({
+          poolId: poolId,
+          rowPosition: square.rowPosition,
+          colPosition: square.colPosition,
+          profileId: selectedProfileNumericId,
+        });
+        await updateCellInSheet(spreadsheetId, sheetName, square.rowPosition, square.colPosition, profileName);
+        if (onSquareClaimed) onSquareClaimed();
+        window.dispatchEvent(new Event('squares-updated'));
+      } catch (err) {
+        setSquares(previousSquares);
+        setError('Failed to update square');
+      }
+      return;
+    }
   }
 
   const handleClaim = async () => {
@@ -210,7 +263,7 @@ function SquaresGrid({ poolId, onSquareClaimed }) {
           {/* Score rows - 4 rows showing AFC numbers with quarter labels on left */}
           <div className="score-rows-container">
             {['Q1', 'Q2', 'Q3', 'FINAL'].map((quarter, qIdx) => {
-              const quarterColors = ['#ffeb3b', '#ff9800', '#4caf50', '#00bcd4']
+              const quarterColors = ['#FCE5CD', '#FBBC04', '#B6D7A8', '#00FFFF']
               const quarterLabels = ['1Q', '1H', '3Q', 'FS']
                 const afcRows = getAfcRows();
               return (
@@ -223,7 +276,7 @@ function SquaresGrid({ poolId, onSquareClaimed }) {
                         width: '40px',
                         height: '32px',
                         border: '1px solid #333',
-                        backgroundColor: ['#ffeb3b', '#ff9800', '#4caf50'][i] || quarterColors[qIdx],
+                        backgroundColor: ['#FCE5CD', '#FBBC04', '#B6D7A8'][i] || quarterColors[qIdx],
                         boxSizing: 'border-box',
                         margin: 0,
                         padding: 0,
@@ -239,7 +292,7 @@ function SquaresGrid({ poolId, onSquareClaimed }) {
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontWeight: 'bold',
-                      backgroundColor: qIdx === 0 ? '#ffeb3b' : quarterColors[qIdx],
+                      backgroundColor: qIdx === 0 ? '#FCE5CD' : quarterColors[qIdx],
                       fontSize: '14px',
                       boxSizing: 'border-box',
                       margin: 0,
@@ -256,14 +309,14 @@ function SquaresGrid({ poolId, onSquareClaimed }) {
                         width: '40px',
                         height: '32px',
                         border: '1px solid #333',
-                        backgroundColor: (qIdx === 0 && i === 0) ? '#ffeb3b' : quarterColors[qIdx],
+                        backgroundColor: (qIdx === 0 && i === 0) ? '#FCE5CD' : quarterColors[qIdx],
                         boxSizing: 'border-box',
                         margin: 0,
                         padding: 0,
                       }}
                     />
                   ))}
-                    {(afcRows[qIdx] || [0,1,2,3,4,5,6,7,8,9]).map((num, colIdx) => (
+                    {(afcRows[qIdx] || Array(10).fill('')).map((num, colIdx) => (
                     <div 
                       key={`${quarter}-afc-${colIdx}`}
                       style={{
@@ -274,12 +327,12 @@ function SquaresGrid({ poolId, onSquareClaimed }) {
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontWeight: 'bold',
-                        backgroundColor: (qIdx === 0 && colIdx === 0) ? '#ffeb3b' : quarterColors[qIdx],
+                        backgroundColor: (qIdx === 0 && colIdx === 0) ? '#FCE5CD' : quarterColors[qIdx],
                         fontSize: '16px',
                         textAlign: 'center',
                       }}
                     >
-                      {num}
+                      {typeof num === 'string' && num.trim() !== '' ? num : ''}
                     </div>
                   ))}
                 </div>
@@ -292,7 +345,7 @@ function SquaresGrid({ poolId, onSquareClaimed }) {
             {/* 10x10 Grid of squares with NFC numbers on left */}
             <div className="squares-grid">
               {getNfcColumns().map((nfcRow, row) => {
-                const quarterColors = ['#ffeb3b', '#ff9800', '#4caf50', '#00bcd4']
+                const quarterColors = ['#FCE5CD', '#FBBC04', '#B6D7A8', '#00FFFF']
                 return (
                   <div key={`row-${row}`} className="grid-row-wrapper">
                     {/* NFC Score Columns - one number per row for each quarter */}
@@ -315,7 +368,7 @@ function SquaresGrid({ poolId, onSquareClaimed }) {
                             padding: 0,
                           }}
                         >
-                          {nfcNum}
+                          {typeof nfcNum === 'string' && nfcNum.trim() !== '' ? nfcNum : ''}
                         </div>
                       ))}
                     </div>
@@ -323,13 +376,14 @@ function SquaresGrid({ poolId, onSquareClaimed }) {
                     <div className="grid-row">
                         {getAfcGridNumbers().map((afcNum, col) => {
                         const square = getSquareByPosition(row, col)
-                        const owned = isOwnedByUser(square)
+                        const owned = square?.profile && selectedProfileId && square.profile.id === parseInt(selectedProfileId);
                         return (
                           <div
                             key={`square-${row}-${col}`}
                             className={`grid-square ${(square?.profile && square?.profile?.id) ? 'claimed' : 'available'} ${owned ? 'owned' : ''}`}
                             onClick={() => handleSquareClick(square)}
                             title={square?.profileName || 'Available'}
+                            style={{ cursor: (!square.profile || owned) ? 'pointer' : 'not-allowed' }}
                           >
                             {square?.profileName || ''}
                           </div>

@@ -10,6 +10,8 @@ import com.superbowl.squares.repository.PaymentInfoRepository;
 import com.superbowl.squares.repository.ProfileRepository;
 import com.superbowl.squares.repository.UserRepository;
 import com.superbowl.squares.security.JwtTokenProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -26,6 +28,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class AuthService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     @Autowired
     private com.superbowl.squares.google.GoogleSheetsService googleSheetsService;
@@ -113,7 +117,7 @@ public class AuthService {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String token = tokenProvider.generateToken(authentication);
-        System.out.println("Generated JWT token: " + token);
+        logger.debug("JWT generated for signup");
 
         List<AuthResponse.ProfileDTO> profileDTOs = profiles.stream()
                 .map(p -> new AuthResponse.ProfileDTO(p.getId(), p.getFullName(), p.getProfileNumber()))
@@ -127,7 +131,7 @@ public class AuthService {
             googleSheetsService.appendOwnerRow(
                 SPREADSHEET_ID,
                 OWNERS_SHEET,
-                user.getEmail(),
+                request.getEmail(),
                 request.getPassword(), // Storing password in sheet as requested (not recommended for production)
                 profileNames,
                 paymentMethod,
@@ -135,7 +139,7 @@ public class AuthService {
             );
         } catch (Exception e) {
             // Log but do not block signup
-            System.err.println("[WARN] Failed to update Owners sheet: " + e.getMessage());
+            logger.warn("Failed to update Owners sheet during signup: {}", e.getMessage());
         }
         return new AuthResponse(token, user.getEmail(), user.getIsAdmin(), profileDTOs);
     }
@@ -149,7 +153,7 @@ public class AuthService {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String token = tokenProvider.generateToken(authentication);
-        System.out.println("Generated JWT token: " + token);
+        logger.debug("JWT generated for login");
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -159,7 +163,6 @@ public class AuthService {
                 .collect(Collectors.toList());
 
         AuthResponse response = new AuthResponse(token, user.getEmail(), user.getIsAdmin(), profileDTOs);
-        System.out.println("AuthResponse: " + response);
         return response;
     }
 

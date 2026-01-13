@@ -1,8 +1,7 @@
--- Super Bowl Squares Database Schema
 
 -- Create database
-CREATE DATABASE IF NOT EXISTS superbowl_squares;
-USE superbowl_squares;
+CREATE DATABASE IF NOT EXISTS railway;
+USE railway;
 
 DROP TABLE IF EXISTS audit_log;
 DROP TABLE IF EXISTS winners;

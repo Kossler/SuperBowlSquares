@@ -1,6 +1,5 @@
--- Seed data for Super Bowl Squares
 
-USE superbowl_squares;
+USE railway;
 
 DELETE FROM squares;
 DELETE FROM pools;

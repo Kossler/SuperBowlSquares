@@ -21,7 +21,7 @@ public class GoogleSheetsController {
                 logger.info("[getNfcScores] spreadsheetId={}, poolName={}", spreadsheetId, poolName);
                 try {
                     List<List<Object>> scores = googleSheetsService.readSheet(spreadsheetId, poolName, "A6:D15");
-                    logger.info("[getNfcScores] Retrieved NFC scores: {}", scores);
+                    logger.debug("[getNfcScores] Retrieved NFC scores: rows={}", scores == null ? 0 : scores.size());
                     return ResponseEntity.ok(scores);
                 } catch (Exception e) {
                     logger.error("[getNfcScores] Exception occurred: ", e);
@@ -37,7 +37,7 @@ public class GoogleSheetsController {
             logger.info("[getAfcScores] spreadsheetId={}, poolName={}", spreadsheetId, poolName);
             try {
                 List<List<Object>> scores = googleSheetsService.readSheet(spreadsheetId, poolName, "F1:O4");
-                logger.info("[getAfcScores] Retrieved AFC scores: {}", scores);
+                logger.debug("[getAfcScores] Retrieved AFC scores: rows={}", scores == null ? 0 : scores.size());
                 return ResponseEntity.ok(scores);
             } catch (Exception e) {
                 logger.error("[getAfcScores] Exception occurred: ", e);
@@ -57,7 +57,7 @@ public class GoogleSheetsController {
             @RequestParam int col,
             @RequestParam String value
     ) {
-        logger.info("[updatePoolCell] spreadsheetId={}, poolName={}, row={}, col={}, value={}", spreadsheetId, poolName, row, col, value);
+        logger.info("[updatePoolCell] spreadsheetId={}, poolName={}, row={}, col={}", spreadsheetId, poolName, row, col);
         try {
             googleSheetsService.updateCell(spreadsheetId, poolName, row, col, value);
             logger.info("[updatePoolCell] Cell updated successfully");
@@ -76,7 +76,7 @@ public class GoogleSheetsController {
             @RequestBody List<List<Object>> grid
     ) {
         logger.info("[updatePoolGrid] spreadsheetId={}, poolName={}", spreadsheetId, poolName);
-        logger.info("[updatePoolGrid] Received grid: {}", grid);
+        logger.debug("[updatePoolGrid] Received grid: rows={}", grid == null ? 0 : grid.size());
         try {
             if (grid == null || grid.size() != 10 || grid.stream().anyMatch(row -> row.size() != 10)) {
                 logger.warn("[updatePoolGrid] Invalid grid size: {}x{}", grid == null ? 0 : grid.size(), (grid != null && !grid.isEmpty()) ? grid.get(0).size() : 0);

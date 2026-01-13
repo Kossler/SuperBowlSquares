@@ -48,7 +48,7 @@ SuperBowlSquares/
 │   └── package.json    # npm dependencies
 ├── database/           # SQL schema and seed data
 ├── cloudflare/         # Deployment configurations
-└── docs/              # Additional documentation
+└── *.md               # Project documentation (root)
 ```
 
 ## ⚡ Quick Commands
@@ -68,6 +68,41 @@ cd frontend && npm install && npm run dev
 # Frontend: http://localhost:5173
 # Backend API: http://localhost:8080/api
 ```
+
+## 🔧 Configuration
+
+### Backend Environment Variables
+
+The backend is configured via environment variables (see [backend/src/main/resources/application.properties](backend/src/main/resources/application.properties)).
+
+Required:
+- `SPRING_DATASOURCE_URL` (example: `jdbc:mysql://localhost:3306/superbowl_squares`)
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+- `JWT_SECRET` (use a strong secret; change in production)
+
+### Frontend Environment Variables
+
+Create `frontend/.env` if you need to point the UI at a different backend:
+
+```env
+VITE_API_URL=http://localhost:8080/api
+```
+
+## 📄 Google Sheets (Service Account)
+
+This project uses a Google **service account** for Sheets access (not OAuth).
+
+1) Create a service account in Google Cloud, enable the **Google Sheets API**, and download its JSON key.
+2) Share your target spreadsheet with the service account email (it looks like `something@project-id.iam.gserviceaccount.com`).
+
+Provide credentials to the backend using **one** of these options:
+
+- **Recommended (production):** set `GOOGLE_APPLICATION_CREDENTIALS_JSON` to the full JSON contents of the key.
+- **Local dev fallback:** place the key at `backend/credentials/service-account.json` (do not commit this file).
+
+Optional sanity check:
+- Run `com.superbowl.squares.google.GoogleSheetsAuth` (it loads credentials and can verify access if you set `GOOGLE_SHEETS_SPREADSHEET_ID`).
 
 ## 🧪 Testing
 
@@ -106,6 +141,18 @@ cd frontend && npm install && npm run dev
 - ✅ SQL injection prevention
 
 See [SECURITY_REPORT.md](SECURITY_REPORT.md) for detailed security analysis.
+
+### Running Snyk Locally
+
+- Frontend (first-party source only): scan `frontend/src`
+- Backend: scan `backend/src/main/java`
+
+If you have Snyk CLI installed and authenticated, you can run a source scan like:
+
+```bash
+snyk code test frontend/src
+snyk code test backend/src/main/java
+```
 
 ## 📊 API Endpoints
 

@@ -1,6 +1,6 @@
 // Add AFC/NFC score fetching for Edit Pool modal
 import { getAfcScoresFromSheet, getNfcScoresFromSheet } from '../services/squaresService'
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   getAllPools,
   createPool,
@@ -79,36 +79,76 @@ function Admin() {
       }
     }, [showEditPool, editPool]);
 
-    // Always load all profiles when Edit Square modal is open
+    // Always load all profiles when Edit Pool modal is open (for dropdown)
     useEffect(() => {
-      if (showEditSquareModal) {
+      if (showEditPool) {
         getAllProfiles().then(profiles => {
           setAllProfiles(Array.isArray(profiles) ? profiles : []);
         });
       }
-    }, [showEditSquareModal]);
+    }, [showEditPool]);
 
     // Load squares for selected pool
     useEffect(() => {
       if (showEditPool && editPool && editPool.id) {
         getSquaresByPool(editPool.id).then(squares => {
-          console.log('DEBUG: Loaded squares for pool', editPool.id, squares);
-          setEditSquares(squares);
+          setEditSquares(Array.isArray(squares) ? squares : [])
         });
       }
     }, [showEditPool, editPool]);
+
+    const editSquaresSheetName = useMemo(() => {
+      return editSquaresPool?.poolName || editPool?.poolName || 'Sheet1'
+    }, [editPool?.poolName, editSquaresPool?.poolName])
     // Admin square click handler
-    const handleAdminSquareClick = (square) => {
-      setSelectedSquare(square);
-      setSelectedProfileId(square?.profile?.id || '');
-      setEditSquaresPool(editPool); // Ensure the pool context is set
-      setShowEditSquareModal(true);
-      setEditSquaresError('');
+    const handleAdminSquareClick = async (square) => {
+      // If a profile is selected in the dropdown, assign/unassign directly
+      if (selectedProfileId) {
+        try {
+          if (square.profile && square.profile.id === parseInt(selectedProfileId)) {
+            // Unclaim if already claimed by selected profile
+            await unclaimSquare(editSquaresPool.id, square.rowPosition, square.colPosition);
+            // Google Sheets sync for removal
+            const spreadsheetId = '1zXue8QE0GBV5GRWv7k5JSR67yRjMf3o7Cj9egY4Fguk';
+            await updateCellInSheet(
+              spreadsheetId,
+              editSquaresSheetName,
+              square.rowPosition,
+              square.colPosition,
+              ''
+            );
+          } else {
+            // Claim for selected profile
+            await claimSquare({
+              poolId: editSquaresPool.id,
+              rowPosition: square.rowPosition,
+              colPosition: square.colPosition,
+              profileId: parseInt(selectedProfileId),
+            });
+            // Google Sheets sync for claim
+            const spreadsheetId = '1zXue8QE0GBV5GRWv7k5JSR67yRjMf3o7Cj9egY4Fguk';
+            const profileObj = allProfiles.find(p => p.id === parseInt(selectedProfileId));
+            const value = profileObj ? profileObj.fullName : '';
+            await updateCellInSheet(
+              spreadsheetId,
+              editSquaresSheetName,
+              square.rowPosition,
+              square.colPosition,
+              value
+            );
+          }
+          getSquaresByPool(editSquaresPool.id).then(setEditSquares);
+        } catch (err) {
+          setEditSquaresError('Failed to update square.');
+        }
+      } else {
+        // No profile selected: do nothing
+        return;
+      }
     };
 
     // Admin assign profile to square
     const handleAdminAssignProfile = async () => {
-      console.log('DEBUG: Save clicked', { selectedSquare, editSquaresPool, selectedProfileId });
       if (!selectedSquare || !editSquaresPool) return;
       try {
         if (selectedProfileId) {
@@ -128,15 +168,13 @@ function Admin() {
         }
 
         // --- Google Sheets Sync Logic ---
-        const pool = await getPoolById(editSquaresPool.id);
         const spreadsheetId = '1zXue8QE0GBV5GRWv7k5JSR67yRjMf3o7Cj9egY4Fguk';
-        const sheetName = pool.poolName || 'Sheet1';
         const value = selectedProfileId
           ? (allProfiles.find(p => p.id === parseInt(selectedProfileId))?.fullName || '')
           : '';
         await updateCellInSheet(
           spreadsheetId,
-          sheetName,
+          editSquaresSheetName,
           selectedSquare.rowPosition,
           selectedSquare.colPosition,
           value
@@ -182,15 +220,12 @@ function Admin() {
   const loadUsers = async () => {
     try {
       const response = await getAllUsers()
-      console.log('Data from getAllUsers:', response); // Debugging log
       if (response && Array.isArray(response.data)) {
         setUsers(response.data)
       } else {
-        console.error("getAllUsers did not return an array in the data property.", response);
         setUsers([]); // Set to empty array to prevent crash
       }
     } catch (err) {
-      console.error('Error in loadUsers:', err); // Debugging log
       setError('Failed to load users')
     }
   }
@@ -334,23 +369,14 @@ function Admin() {
     setError('')
     setMessage('')
 
-    // Step 1: Log the raw input
-    console.log('[DEBUG] handleCreatePool: raw newPool:', newPool);
-
     // Step 2: Prepare payload
     const payload = {
       poolName: newPool.poolName,
       betAmount: newPool.betAmount === '' ? null : newPool.betAmount.toString()
     };
-    console.log('[DEBUG] handleCreatePool: payload to send:', payload, 'Types:', {
-      poolName: typeof payload.poolName,
-      betAmount: typeof payload.betAmount
-    });
 
     try {
-      // Step 3: Send request
       const response = await createPool(payload);
-      console.log('[DEBUG] handleCreatePool: response:', response);
       setMessage('Pool created successfully!')
       setShowCreatePool(false)
       setNewPool({
@@ -359,10 +385,7 @@ function Admin() {
       })
       loadPools()
     } catch (err) {
-      // Step 4: Log error details
-      console.error('[DEBUG] handleCreatePool: error:', err);
       if (err.response) {
-        console.error('[DEBUG] handleCreatePool: error.response.data:', err.response.data);
         setError(err.response.data?.message || JSON.stringify(err.response.data) || 'Failed to create pool');
       } else {
         setError('Failed to create pool: ' + err.message);
@@ -490,6 +513,11 @@ function Admin() {
                             poolName: pool.poolName,
                             betAmount: pool.betAmount,
                           })
+                          setEditSquaresPool({
+                            id: pool.id,
+                            poolName: pool.poolName,
+                            betAmount: pool.betAmount,
+                          })
                           setShowEditPool(true)
                         }}
                         style={{ marginLeft: '10px' }}
@@ -596,7 +624,6 @@ function Admin() {
             {activeModalTab === 'profiles' && (
               <div className="user-details-section">
                 <h3>Profiles</h3>
-                {console.log('DEBUG editingUser:', editingUser)}
                 <table className="sub-table">
                   <thead>
                     <tr>
@@ -789,12 +816,32 @@ function Admin() {
               <div style={{ flex: 1, minWidth: 0, maxWidth: 'fit-content' }}>
                 {/* Edit Square Panel removed; will show as modal popup below */}
                 <h3>Edit Squares for this Pool</h3>
+                {/* Persistent profile dropdown for grid assignment */}
+                <div style={{ marginTop: '1em', marginBottom: '1em' }}>
+                  <label htmlFor="admin-profile-dropdown"><strong>Select Profile:</strong></label>
+                  <select
+                    id="admin-profile-dropdown"
+                    value={selectedProfileId}
+                    onChange={e => setSelectedProfileId(e.target.value)}
+                    style={{ marginLeft: '1em', minWidth: '200px' }}
+                  >
+                    <option value="">-- Unassigned --</option>
+                    {allProfiles.length === 0
+                      ? <option disabled>-- No profiles found --</option>
+                      : [...allProfiles].sort((a, b) => a.fullName.localeCompare(b.fullName)).map(profile => (
+                          <option key={profile.id} value={profile.id}>{profile.fullName} ({profile.userEmail})</option>
+                        ))}
+                  </select>
+                  <span style={{ marginLeft: '1em', color: '#888' }}>
+                    Select a profile, then click a square to assign/unassign.
+                  </span>
+                </div>
                 <div className="grid-wrapper">
                   <div className="grid-container">
                     {/* Score rows - 4 rows showing AFC numbers with quarter labels on left */}
                     <div className="score-rows-container">
                       {['Q1', 'Q2', 'Q3', 'FINAL'].map((quarter, qIdx) => {
-                        const quarterColors = ['#ffeb3b', '#ff9800', '#4caf50', '#00bcd4']
+                        const quarterColors = ['#FCE5CD', '#FBBC04', '#B6D7A8', '#00FFFF']
                         const quarterLabels = ['1Q', '1H', '3Q', 'FS']
                         // Use AFC numbers from editPool, fallback to 0-9
                         // Use AFC scores from sheet if available, else fallback
@@ -809,7 +856,7 @@ function Admin() {
                                   width: '40px',
                                   height: '32px',
                                   border: '1px solid #333',
-                                  backgroundColor: ['#ffeb3b', '#ff9800', '#4caf50'][i] || quarterColors[qIdx],
+                                  backgroundColor: ['#FCE5CD', '#FBBC04', '#B6D7A8'][i] || quarterColors[qIdx],
                                   boxSizing: 'border-box',
                                   margin: 0,
                                   padding: 0,
@@ -849,7 +896,7 @@ function Admin() {
                                 }}
                               />
                             ))}
-                            {(afcRow && afcRow.length === 10 ? afcRow : [0,1,2,3,4,5,6,7,8,9]).map((num, colIdx) => (
+                            {(afcRow && afcRow.length === 10 ? afcRow : Array(10).fill('')).map((num, colIdx) => (
                               <div 
                                 key={`${quarter}-afc-${colIdx}`}
                                 style={{
@@ -865,7 +912,7 @@ function Admin() {
                                   textAlign: 'center',
                                 }}
                               >
-                                {num}
+                                {typeof num === 'string' && num.trim() !== '' ? num : ''}
                               </div>
                             ))}
                           </div>
@@ -878,9 +925,9 @@ function Admin() {
                       <div className="squares-grid">
                         {/* Use NFC numbers from editPool, fallback to 0-9 for 4 columns */}
                         {Array.from({ length: 10 }).map((_, row) => {
-                          const quarterColors = ['#ffeb3b', '#ff9800', '#4caf50', '#00bcd4']
+                          const quarterColors = ['#FCE5CD', '#FBBC04', '#B6D7A8', '#00FFFF']
                           // Use NFC scores from sheet if available, else fallback
-                          let nfcRow = (nfcScores && Array.isArray(nfcScores) && nfcScores[row]) ? nfcScores[row] : (editPool.nfcNumbers ? Array(4).fill(editPool.nfcNumbers.split(',').map(n => n.trim())[row] ?? row) : Array(4).fill(row));
+                          let nfcRow = (nfcScores && Array.isArray(nfcScores) && nfcScores[row]) ? nfcScores[row] : (editPool.nfcNumbers ? Array(4).fill(editPool.nfcNumbers.split(',').map(n => n.trim())[row] ?? '') : Array(4).fill(''));
                           return (
                             <div key={`row-${row}`} className="grid-row-wrapper">
                               {/* NFC Score Columns - one number per row for each quarter */}
@@ -903,7 +950,7 @@ function Admin() {
                                       padding: 0,
                                     }}
                                   >
-                                    {nfcNum}
+                                    {typeof nfcNum === 'string' && nfcNum.trim() !== '' ? nfcNum : ''}
                                   </div>
                                 ))}
                               </div>
@@ -914,19 +961,25 @@ function Admin() {
                                   if (!square) {
                                     square = { rowPosition: row, colPosition: col };
                                   }
-                                  const isClaimed = (square?.profile && square?.profile?.id) || square?.profileName;
-                                  if (isClaimed) {
-                                    console.log(`DEBUG: Claimed square at row ${row}, col ${col}:`, square);
+                                  const isOwned = square?.profile && selectedProfileId && square.profile.id === parseInt(selectedProfileId);
+                                  const isClaimed = square?.profile || square?.profileName;
+                                  let squareClass = 'grid-square';
+                                  if (isOwned) {
+                                    squareClass += ' owned';
+                                  } else if (isClaimed) {
+                                    squareClass += ' claimed';
+                                  } else {
+                                    squareClass += ' available';
                                   }
                                   return (
                                     <div
                                       key={`square-${row}-${col}`}
-                                      className={`grid-square ${isClaimed ? 'claimed' : 'available'}`}
+                                      className={squareClass}
                                       title={square?.profileName || 'Available'}
                                       style={{ cursor: 'pointer' }}
                                       onClick={() => handleAdminSquareClick(square)}
                                     >
-                                      {isClaimed ? (square?.profileName || 'Occupied') : ''}
+                                      {square?.profileName || ''}
                                     </div>
                                   );
                                 })}
@@ -969,12 +1022,10 @@ function Admin() {
                   try {
                     await unclaimSquare(editSquaresPool.id, selectedSquare.rowPosition, selectedSquare.colPosition);
                     // Google Sheets sync for removal
-                    const pool = await getPoolById(editSquaresPool.id);
                     const spreadsheetId = '1zXue8QE0GBV5GRWv7k5JSR67yRjMf3o7Cj9egY4Fguk';
-                    const sheetName = pool.poolName || 'Sheet1';
                     await updateCellInSheet(
                       spreadsheetId,
-                      sheetName,
+                      editSquaresSheetName,
                       selectedSquare.rowPosition,
                       selectedSquare.colPosition,
                       ''

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
-import { getActivePools, getPoolStats } from '../services/squaresService'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { getActivePools, getPoolStats, getMe } from '../services/squaresService'
 import SquaresGrid from '../components/SquaresGrid'
+import { getUser, setUser } from '../utils/auth'
 import './Entry.css'
 
 function Entry() {
@@ -8,10 +10,28 @@ function Entry() {
   const [selectedPool, setSelectedPool] = useState(null)
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [user, setUserState] = useState(() => getUser())
+  const [selectedProfileId, setSelectedProfileId] = useState(() => getUser()?.profiles?.[0]?.id || '')
 
   useEffect(() => {
-    loadPools()
-  }, [])
+    // Fetch latest user info on mount
+    const fetchUser = async () => {
+      try {
+        const freshUser = await getMe();
+        setUser(freshUser);
+        setUserState(freshUser);
+        // If no profile selected, default to first
+        if (!selectedProfileId && freshUser?.profiles?.length > 0) {
+          setSelectedProfileId(freshUser.profiles[0].id)
+        }
+      } catch (err) {
+        // fallback to local user
+        setUserState(getUser())
+      }
+    };
+    fetchUser();
+    loadPools();
+  }, []);
 
   useEffect(() => {
     if (selectedPool) {
@@ -19,7 +39,7 @@ function Entry() {
     }
   }, [selectedPool])
 
-  const loadPools = async () => {
+  const loadPools = useCallback(async () => {
     try {
       const poolsData = await getActivePools()
       setPools(poolsData)
@@ -31,22 +51,33 @@ function Entry() {
       console.error('Failed to load pools', err)
       setLoading(false)
     }
-  }
+  }, [])
 
-  const loadStats = async (poolId) => {
+  const loadStats = useCallback(async (poolId) => {
     try {
       const statsData = await getPoolStats(poolId)
       setStats(statsData)
     } catch (err) {
       console.error('Failed to load stats', err)
     }
-  }
+  }, [])
 
-  const handleSquareClaimed = () => {
+  const handleSquareClaimed = useCallback(() => {
     if (selectedPool) {
       loadStats(selectedPool.id)
     }
-  }
+  }, [loadStats, selectedPool])
+
+  const handlePoolChange = useCallback(
+    (e) => {
+      const nextId = parseInt(e.target.value)
+      const pool = pools.find((p) => p.id === nextId)
+      setSelectedPool(pool)
+    },
+    [pools]
+  )
+
+  const poolOptions = useMemo(() => pools, [pools])
 
   if (loading) {
     return <div className="loading">Loading...</div>
@@ -62,12 +93,9 @@ function Entry() {
           <label>Select Pool:</label>
           <select 
             value={selectedPool?.id || ''} 
-            onChange={(e) => {
-              const pool = pools.find(p => p.id === parseInt(e.target.value))
-              setSelectedPool(pool)
-            }}
+            onChange={handlePoolChange}
           >
-            {pools.map(pool => (
+            {poolOptions.map(pool => (
               <option key={pool.id} value={pool.id}>
                 {pool.poolName} - ${pool.betAmount}
               </option>
@@ -95,13 +123,23 @@ function Entry() {
 
       {selectedPool && (
         <div className="card">
-          <h2>Select Your Squares</h2>
+          <h2>{selectedPool.poolName} - Select Your Squares</h2>
+          <div className="form-group" style={{ marginBottom: '1em' }}>
+            <label>Select Profile:</label>
+            <select
+              value={selectedProfileId}
+              onChange={e => setSelectedProfileId(e.target.value)}
+            >
+              {user?.profiles?.map(profile => (
+                <option key={profile.id} value={profile.id}>{profile.fullName}</option>
+              ))}
+            </select>
+          </div>
           <p className="instructions">
-            Click on an available square to claim it with one of your profiles.
-            White squares are available, light blue squares are yours, and darker green squares belong to others.
+            Click on a yellow square to claim it for this profile. Click again to unclaim. You can only edit squares for the selected profile.
           </p>
           <div className="grid-wrapper">
-            <SquaresGrid poolId={selectedPool.id} onSquareClaimed={handleSquareClaimed} />
+            <SquaresGrid poolId={selectedPool.id} onSquareClaimed={handleSquareClaimed} selectedProfileId={selectedProfileId} />
           </div>
         </div>
       )}
