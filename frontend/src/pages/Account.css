@@ -1,0 +1,102 @@
+.account-muted {
+  color: #333;
+  margin-top: 0;
+}
+
+.account-form {
+  margin-top: 10px;
+}
+
+.account-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-list-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.account-profile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.account-profile-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.account-inline-input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.account-payment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.account-payment-fields {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+}
+
+.account-payment-fields .form-group {
+  margin-bottom: 0;
+}
+
+.account-payment-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.account-primary {
+  font-weight: 700;
+}
+
+.success {
+  background: #e9f7ef;
+  border: 1px solid #b7e1cd;
+  color: #1e4620;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 700px) {
+  .account-list-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .account-profile-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .account-payment-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .account-payment-fields {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

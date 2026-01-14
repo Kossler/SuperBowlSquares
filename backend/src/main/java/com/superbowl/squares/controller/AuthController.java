@@ -1,10 +1,12 @@
 package com.superbowl.squares.controller;
 
+import com.fasterxml.jackson.annotation.JsonView;
 import com.superbowl.squares.dto.AuthResponse;
 import com.superbowl.squares.dto.LoginRequest;
 import com.superbowl.squares.dto.SignupRequest;
 import com.superbowl.squares.model.User;
 import com.superbowl.squares.service.AuthService;
+import com.superbowl.squares.view.View;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +37,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
+    @JsonView(View.Detail.class)
     public ResponseEntity<User> getMe(Authentication authentication) {
         User user = authService.getUserFromAuthentication(authentication);
         return ResponseEntity.ok(user);

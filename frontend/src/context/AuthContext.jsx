@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useMemo, useCallback, useState } from 'react';
 import { setToken as storeToken, getToken, removeToken, setUser as storeUser, getUser } from '../utils/auth';
 
 const AuthContext = createContext(null);
@@ -6,7 +6,7 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(getUser());
 
-  const login = (userData) => {
+  const login = useCallback((userData) => {
     console.log("AuthContext login received userData:", userData);
     const newUser = {
       email: userData.email,
@@ -16,20 +16,28 @@ export const AuthProvider = ({ children }) => {
     storeToken(userData.token);
     storeUser(newUser);
     setUser(newUser);
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     removeToken();
     setUser(null);
-  };
+  }, []);
 
-  const auth = {
-    user,
-    isAuthenticated: !!user,
-    isAdmin: user?.isAdmin || false,
-    login,
-    logout
-  };
+  const updateUser = useCallback((nextUser) => {
+    storeUser(nextUser);
+    setUser(nextUser);
+  }, []);
+
+  const auth = useMemo(() => {
+    return {
+      user,
+      isAuthenticated: !!user,
+      isAdmin: user?.isAdmin || false,
+      login,
+      logout,
+      updateUser
+    };
+  }, [user, login, logout, updateUser]);
 
   return (
     <AuthContext.Provider value={auth}>

@@ -18,7 +18,7 @@ public class SignupRequest {
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
     
-    @Size(max = 9, message = "Maximum 9 profiles allowed")
+    @Size(max = 10, message = "Maximum 10 profiles allowed")
     private List<ProfileDTO> profiles;
     
     private PaymentInfoDTO paymentInfo;

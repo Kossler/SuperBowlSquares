@@ -19,8 +19,8 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
-    // Debug: log API request details
-    console.log('[API REQUEST]', config.method?.toUpperCase(), config.baseURL + config.url, config)
+    // Log requests without leaking sensitive headers (e.g., JWT)
+    console.log('[API REQUEST]', config.method?.toUpperCase(), config.baseURL + config.url)
     return config
   },
   (error) => {
@@ -31,12 +31,20 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => {
-    // Debug: log API response details
-    console.log('[API RESPONSE]', response.config.method?.toUpperCase(), response.config.baseURL + response.config.url, response)
+    console.log(
+      '[API RESPONSE]',
+      response.config.method?.toUpperCase(),
+      response.config.baseURL + response.config.url,
+      response.status
+    )
     return response
   },
   (error) => {
-    console.error('[API RESPONSE ERROR]', error)
+    const method = error?.config?.method?.toUpperCase?.() || ''
+    const url = (error?.config?.baseURL || '') + (error?.config?.url || '')
+    const status = error?.response?.status
+    const data = error?.response?.data
+    console.error('[API RESPONSE ERROR]', method, url, status, data || error?.message)
     return Promise.reject(error)
   }
 )

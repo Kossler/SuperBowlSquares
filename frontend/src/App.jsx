@@ -1,9 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Navbar from './components/Navbar'
-import Home from './pages/Home'
 import Entry from './pages/Entry'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
+import Account from './pages/Account'
 import { useAuth } from './context/AuthContext.jsx'
 
 function App() {
@@ -13,7 +13,12 @@ function App() {
     <Router>
       <Navbar />
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route
+          path="/"
+          element={
+            isAuthenticated ? <Navigate to="/entry" /> : <Login />
+          }
+        />
         <Route 
           path="/entry" 
           element={
@@ -23,14 +28,21 @@ function App() {
         <Route 
           path="/login" 
           element={
-            isAuthenticated ? <Navigate to="/" /> : <Login />
+            isAuthenticated ? <Navigate to="/entry" /> : <Login />
           } 
         />
         <Route 
           path="/admin" 
           element={
-            isAuthenticated && isAdmin ? <Admin /> : <Navigate to="/" />
+            isAuthenticated && isAdmin ? <Admin /> : <Navigate to="/login" />
           } 
+        />
+
+        <Route
+          path="/account"
+          element={
+            isAuthenticated ? <Account /> : <Navigate to="/login" />
+          }
         />
       </Routes>
     </Router>

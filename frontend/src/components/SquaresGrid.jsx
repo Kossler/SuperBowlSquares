@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getSquaresByPool, getActivePools, claimSquare, unclaimSquare, getPoolById, syncGridToSheet, getAfcScoresFromSheet, getNfcScoresFromSheet, updateCellInSheet } from '../services/squaresService'
+import { getSquaresByPool, getActivePools, claimSquare, unclaimSquare, getPoolById, syncGridToSheet, updateCellInSheet } from '../services/squaresService'
 import { getUser } from '../utils/auth'
 import './SquaresGrid.css'
 
@@ -11,27 +11,7 @@ function SquaresGrid({ poolId, onSquareClaimed, selectedProfileId }) {
   const [showModal, setShowModal] = useState(false)
   const [selectedProfile, setSelectedProfile] = useState('')
   const [error, setError] = useState('')
-  const [afcScores, setAfcScores] = useState(null)
-  const [nfcScores, setNfcScores] = useState(null)
   const user = getUser()
-  // Fetch AFC and NFC scores from backend when pool changes
-  useEffect(() => {
-    const fetchScores = async () => {
-      if (!pool) return;
-      try {
-        const spreadsheetId = '1zXue8QE0GBV5GRWv7k5JSR67yRjMf3o7Cj9egY4Fguk';
-        const sheetName = pool.poolName || 'Sheet1';
-        const afc = await getAfcScoresFromSheet(spreadsheetId, sheetName);
-        setAfcScores(afc);
-        const nfc = await getNfcScoresFromSheet(spreadsheetId, sheetName);
-        setNfcScores(nfc);
-      } catch (err) {
-        setAfcScores(null);
-        setNfcScores(null);
-      }
-    };
-    fetchScores();
-  }, [pool]);
 
   useEffect(() => {
     loadData()
@@ -66,39 +46,6 @@ function SquaresGrid({ poolId, onSquareClaimed, selectedProfileId }) {
     }
   }
 
-  // Returns all AFC rows for colored rows, and first row for grid columns
-  const getAfcRows = () => {
-    if (afcScores && Array.isArray(afcScores) && afcScores.length > 0) {
-      return afcScores;
-    }
-    if (pool?.afcNumbers) {
-      return [pool.afcNumbers.split(',').map(n => n.trim())];
-    }
-    return [Array(10).fill('')];
-  }
-
-  // For grid columns, always use first row
-  const getAfcGridNumbers = () => {
-    const rows = getAfcRows();
-    return rows[0] || Array(10).fill('');
-  }
-
-  // For NFC score columns, use backend NFC scores if available
-  // Returns a 10x4 array for A6:D15 (10 rows, 4 columns)
-  const getNfcColumns = () => {
-    if (nfcScores && Array.isArray(nfcScores) && nfcScores.length > 0) {
-      // nfcScores is expected to be a 10x4 array (A6:D15)
-      return nfcScores;
-    }
-    // Fallback: single column of numbers
-    if (pool?.nfcNumbers) {
-      // If only a single column, repeat for 4 columns
-      const col = pool.nfcNumbers.split(',').map(n => n.trim());
-      return Array.from({ length: 10 }, (_, i) => Array(4).fill(col[i] || ''));
-    }
-    // Default: empty for 4 columns
-    return Array.from({ length: 10 }, () => Array(4).fill(''));
-  }
 
   // New: Only allow editing for selected profile
   const handleSquareClick = async (square) => {
@@ -167,7 +114,7 @@ function SquaresGrid({ poolId, onSquareClaimed, selectedProfileId }) {
 
   const handleClaim = async () => {
     if (!selectedProfile) {
-      setError('Please select a profile');
+      setError('Please select a square name');
       return;
     }
 
@@ -260,140 +207,25 @@ function SquaresGrid({ poolId, onSquareClaimed, selectedProfileId }) {
     <>
       <div className="grid-wrapper">
         <div className="grid-container">
-          {/* Score rows - 4 rows showing AFC numbers with quarter labels on left */}
-          <div className="score-rows-container">
-            {['Q1', 'Q2', 'Q3', 'FINAL'].map((quarter, qIdx) => {
-              const quarterColors = ['#FCE5CD', '#FBBC04', '#B6D7A8', '#00FFFF']
-              const quarterLabels = ['1Q', '1H', '3Q', 'FS']
-                const afcRows = getAfcRows();
-              return (
-                <div key={quarter} style={{ display: 'flex', marginBottom: '2px' }}>
-                  {/* Empty spacing cells before label (qIdx cells) */}
-                  {Array.from({ length: qIdx }).map((_, i) => (
-                    <div
-                        key={`space-before-${qIdx}-${i}`}
-                        style={{
-                        width: '40px',
-                        height: '32px',
-                        border: '1px solid #333',
-                        backgroundColor: ['#FCE5CD', '#FBBC04', '#B6D7A8'][i] || quarterColors[qIdx],
-                        boxSizing: 'border-box',
-                        margin: 0,
-                        padding: 0,
-                        }}
-                    />
-                  ))}
-                  <div
-                    style={{
-                      width: '40px',
-                      height: '32px',
-                      border: '1px solid #333',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 'bold',
-                      backgroundColor: qIdx === 0 ? '#FCE5CD' : quarterColors[qIdx],
-                      fontSize: '14px',
-                      boxSizing: 'border-box',
-                      margin: 0,
-                      padding: 0,
-                    }}
-                  >
-                    {quarterLabels[qIdx]}
-                  </div>
-                  {/* Empty spacing cells after label (3 - qIdx cells) */}
-                  {Array.from({ length: 3 - qIdx }).map((_, i) => (
-                    <div
-                      key={`space-after-${qIdx}-${i}`}
-                      style={{
-                        width: '40px',
-                        height: '32px',
-                        border: '1px solid #333',
-                        backgroundColor: (qIdx === 0 && i === 0) ? '#FCE5CD' : quarterColors[qIdx],
-                        boxSizing: 'border-box',
-                        margin: 0,
-                        padding: 0,
-                      }}
-                    />
-                  ))}
-                    {(afcRows[qIdx] || Array(10).fill('')).map((num, colIdx) => (
-                    <div 
-                      key={`${quarter}-afc-${colIdx}`}
-                      style={{
-                        width: '80px',
-                        height: '32px',
-                        border: '1px solid #333',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 'bold',
-                        backgroundColor: (qIdx === 0 && colIdx === 0) ? '#FCE5CD' : quarterColors[qIdx],
-                        fontSize: '16px',
-                        textAlign: 'center',
-                      }}
-                    >
-                      {typeof num === 'string' && num.trim() !== '' ? num : ''}
-                    </div>
-                  ))}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Main grid area with NFC score columns on left */}
-          <div className="main-grid-area">
-            {/* 10x10 Grid of squares with NFC numbers on left */}
-            <div className="squares-grid">
-              {getNfcColumns().map((nfcRow, row) => {
-                const quarterColors = ['#FCE5CD', '#FBBC04', '#B6D7A8', '#00FFFF']
+          <div className="grid-only">
+            {Array.from({ length: 10 }).map((_, row) =>
+              Array.from({ length: 10 }).map((_, col) => {
+                const square = getSquareByPosition(row, col)
+                const owned = square?.profile && selectedProfileId && square.profile.id === parseInt(selectedProfileId)
+                const isClaimed = Boolean(square?.profile && square?.profile?.id)
                 return (
-                  <div key={`row-${row}`} className="grid-row-wrapper">
-                    {/* NFC Score Columns - one number per row for each quarter */}
-                    <div className="nfc-score-columns">
-                      {nfcRow.map((nfcNum, qIdx) => (
-                        <div 
-                          key={`nfc-col-${qIdx}-row-${row}`}
-                          style={{
-                            width: '40px',
-                            height: '60px',
-                            border: '1px solid #333',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 'bold',
-                            backgroundColor: quarterColors[qIdx],
-                            fontSize: '16px',
-                            boxSizing: 'border-box',
-                            margin: 0,
-                            padding: 0,
-                          }}
-                        >
-                          {typeof nfcNum === 'string' && nfcNum.trim() !== '' ? nfcNum : ''}
-                        </div>
-                      ))}
-                    </div>
-                    {/* Grid squares for this row */}
-                    <div className="grid-row">
-                        {getAfcGridNumbers().map((afcNum, col) => {
-                        const square = getSquareByPosition(row, col)
-                        const owned = square?.profile && selectedProfileId && square.profile.id === parseInt(selectedProfileId);
-                        return (
-                          <div
-                            key={`square-${row}-${col}`}
-                            className={`grid-square ${(square?.profile && square?.profile?.id) ? 'claimed' : 'available'} ${owned ? 'owned' : ''}`}
-                            onClick={() => handleSquareClick(square)}
-                            title={square?.profileName || 'Available'}
-                            style={{ cursor: (!square.profile || owned) ? 'pointer' : 'not-allowed' }}
-                          >
-                            {square?.profileName || ''}
-                          </div>
-                        )
-                      })}
-                    </div>
+                  <div
+                    key={`square-${row}-${col}`}
+                    className={`grid-square ${isClaimed ? 'claimed' : 'available'} ${owned ? 'owned' : ''}`}
+                    onClick={() => handleSquareClick(square)}
+                    title={square?.profileName || 'Available'}
+                    style={{ cursor: (!square?.profile || owned) ? 'pointer' : 'not-allowed' }}
+                  >
+                    {square?.profileName || ''}
                   </div>
                 )
-              })}
-            </div>
+              })
+            )}
           </div>
         </div>
       </div>
@@ -434,12 +266,12 @@ function SquaresGrid({ poolId, onSquareClaimed, selectedProfileId }) {
               ) : (
                 <>
                   <div className="form-group">
-                    <label>Select Profile:</label>
+                    <label>Select Square Name:</label>
                     <select 
                       value={selectedProfile} 
                       onChange={(e) => setSelectedProfile(e.target.value)}
                     >
-                      <option value="">-- Select a profile --</option>
+                      <option value="">-- Select a square name --</option>
                       {user?.profiles?.map(profile => (
                         <option key={profile.id} value={profile.id}>
                           {profile.fullName}

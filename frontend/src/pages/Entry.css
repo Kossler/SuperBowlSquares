@@ -15,6 +15,12 @@
   border-radius: 4px;
 }
 
+.entry-summary-total {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .stats {
   margin-top: 20px;
   padding: 15px;
@@ -35,7 +41,146 @@
   color: #856404;
 }
 
-.grid-wrapper {
-  overflow-x: auto;
+.entry-grid {
   padding: 20px 0;
+}
+
+/* Entry help modal (moved from Home) */
+.home-help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 2000;
+}
+
+.home-help-overlay--mobile {
+  align-items: flex-end;
+  padding: 0;
+}
+
+.home-help-modal {
+  position: relative;
+  width: min(560px, 100%);
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.home-help-modal--mobile {
+  width: 100%;
+  max-height: 85vh;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+.home-help-modal h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.home-help-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: none;
+  background: transparent;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  color: #333;
+}
+
+.home-help-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #333;
+}
+
+.home-help-list li {
+  margin-bottom: 10px;
+}
+
+.home-help-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+  .home-help-modal {
+    padding: 14px;
+  }
+
+  .home-help-modal--mobile {
+    padding: 16px;
+  }
+}
+
+/* Pool selection buttons (desktop) */
+.entry-pool-buttons {
+  display: none;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.entry-pool-btn {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.entry-pool-btn.active {
+  border-color: #007bff;
+}
+
+.entry-profile-buttons {
+  display: none;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.entry-profile-btn {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.entry-profile-btn.active {
+  border-color: #007bff;
+}
+
+@media (min-width: 701px) {
+  .entry-pool-select {
+    display: none;
+  }
+
+  .entry-pool-buttons {
+    display: flex;
+  }
+
+  .entry-profile-select {
+    display: none;
+  }
+
+  .entry-profile-buttons {
+    display: flex;
+  }
 }

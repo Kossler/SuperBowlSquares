@@ -68,8 +68,8 @@ public class AuthService {
         if (request.getProfiles() == null || request.getProfiles().isEmpty()) {
             throw new RuntimeException("At least one profile is required");
         }
-        if (request.getProfiles().size() > 9) {
-            throw new RuntimeException("Maximum 9 profiles allowed");
+        if (request.getProfiles().size() > 10) {
+            throw new RuntimeException("Maximum 10 profiles allowed");
         }
 
         // Require payment info

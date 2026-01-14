@@ -1,14 +1,89 @@
+
 .grid-wrapper {
-  overflow-x: auto;
+  overflow-x: hidden;
   display: flex;
   justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 700px) {
+  .grid-wrapper {
+    padding: 0 2px;
+    justify-content: flex-start;
+    overflow-x: hidden;
+  }
+  .grid-container {
+    min-width: unset;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+  }
+  .score-row .score-cell,
+  .nfc-score-columns > div,
+  .grid-square {
+    font-size: 11px;
+    padding: 1px;
+  }
+  .score-row .quarter-label {
+    width: 80px;
+    font-size: 13px;
+    height: 32px;
+    padding: 0;
+  }
+  .nfc-score-columns {
+    width: 80px;
+  }
+  .main-grid-area {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 .grid-container {
-  display: inline-block;
-  min-width: fit-content;
+  display: block;
+  width: 100%;
   background: white;
   border: 2px solid #333;
+}
+
+/* Desktop: keep entire 10x10 grid visible without page scroll */
+@media (min-width: 701px) {
+  .grid-wrapper {
+    padding: 8px;
+  }
+
+  /* 10 columns wide, 10 rows tall; using vmin ensures it fits both width+height */
+  .grid-container {
+    width: min(720px, 70vmin);
+    margin: 0 auto;
+  }
+
+  .grid-only {
+    gap: 1px;
+  }
+
+  .grid-square {
+    font-size: 11px;
+    padding: 1px;
+  }
+}
+
+/* Squares-only grid (10x10) */
+.grid-only {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 2px;
+}
+
+/* Make each square truly square and responsive */
+.grid-only .grid-square {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  min-height: 0;
+  border-left: 1px solid #333;
 }
 
 /* Score rows container - 4 rows above grid */

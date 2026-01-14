@@ -1,5 +1,3 @@
-// Add AFC/NFC score fetching for Edit Pool modal
-import { getAfcScoresFromSheet, getNfcScoresFromSheet } from '../services/squaresService'
 import { useMemo, useState, useEffect } from 'react'
 import {
   getAllPools,
@@ -52,33 +50,6 @@ function Admin() {
     const [newPool, setNewPool] = useState({ poolName: '', betAmount: '' });
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
-    // AFC/NFC scores for the edit pool modal
-    const [afcScores, setAfcScores] = useState(null);
-    const [nfcScores, setNfcScores] = useState(null);
-
-    // Fetch AFC/NFC scores when editPool changes (Edit Pool modal open)
-    useEffect(() => {
-      if (showEditPool && editPool && editPool.poolName) {
-        const fetchScores = async () => {
-          try {
-            const spreadsheetId = '1zXue8QE0GBV5GRWv7k5JSR67yRjMf3o7Cj9egY4Fguk';
-            const sheetName = editPool.poolName || 'Sheet1';
-            const afc = await getAfcScoresFromSheet(spreadsheetId, sheetName);
-            setAfcScores(afc);
-            const nfc = await getNfcScoresFromSheet(spreadsheetId, sheetName);
-            setNfcScores(nfc);
-          } catch (err) {
-            setAfcScores(null);
-            setNfcScores(null);
-          }
-        };
-        fetchScores();
-      } else {
-        setAfcScores(null);
-        setNfcScores(null);
-      }
-    }, [showEditPool, editPool]);
-
     // Always load all profiles when Edit Pool modal is open (for dropdown)
     useEffect(() => {
       if (showEditPool) {
@@ -279,7 +250,7 @@ function Admin() {
     try {
       if (editingProfile) {
         await updateProfile(editingProfile.id, profileData);
-        setMessage('Profile updated successfully!');
+        setMessage('Square name updated successfully!');
       } else {
         // Auto-assign profile number
         const profiles = editingUser.profiles || [];
@@ -289,7 +260,7 @@ function Admin() {
           profileNumber: maxProfileNumber + 1
         };
         await createProfile(editingUser.id, newProfile);
-        setMessage('Profile created successfully!');
+        setMessage('Square name created successfully!');
       }
       setEditingProfile(null);
       setProfileData({ fullName: '', profileNumber: '' });
@@ -298,11 +269,11 @@ function Admin() {
       setEditingUser(response.data);
     } catch (err) {
       console.error('Profile save error:', err);
-      let errorMsg = 'Failed to save profile.';
+      let errorMsg = 'Failed to save square name.';
       const backendMsg = err?.response?.data?.message || err?.response?.data?.error || '';
       if ((err.response && err.response.status === 400 && typeof backendMsg === 'string' && backendMsg.toLowerCase().includes('full name')) ||
           (typeof err.message === 'string' && err.message.toLowerCase().includes('full name'))) {
-        errorMsg = 'A profile with this full name already exists. Please choose a different name.';
+        errorMsg = 'A square name with this full name already exists. Please choose a different name.';
       } else if (backendMsg) {
         errorMsg = backendMsg;
       }
@@ -312,15 +283,15 @@ function Admin() {
   };
 
   const handleDeleteProfile = async (profileId) => {
-    if (window.confirm('Are you sure you want to delete this profile?')) {
+    if (window.confirm('Are you sure you want to delete this square name?')) {
       try {
         await deleteProfile(profileId);
-        setMessage('Profile deleted successfully!');
+        setMessage('Square name deleted successfully!');
         // Refresh the user data in the modal
         const response = await getUserById(editingUser.id);
         setEditingUser(response.data);
       } catch (err) {
-        setError('Failed to delete profile.');
+        setError('Failed to delete square name.');
       }
     }
   };
@@ -589,7 +560,7 @@ function Admin() {
 
             <div className="modal-tabs">
               <button className={`tab-button ${activeModalTab === 'details' ? 'active' : ''}`} onClick={() => setActiveModalTab('details')}>User Details</button>
-              <button className={`tab-button ${activeModalTab === 'profiles' ? 'active' : ''}`} onClick={() => setActiveModalTab('profiles')}>Profiles</button>
+              <button className={`tab-button ${activeModalTab === 'profiles' ? 'active' : ''}`} onClick={() => setActiveModalTab('profiles')}>Square Names</button>
               <button className={`tab-button ${activeModalTab === 'payment' ? 'active' : ''}`} onClick={() => setActiveModalTab('payment')}>Payment</button>
             </div>
 
@@ -623,12 +594,12 @@ function Admin() {
 
             {activeModalTab === 'profiles' && (
               <div className="user-details-section">
-                <h3>Profiles</h3>
+                <h3>Square Names</h3>
                 <table className="sub-table">
                   <thead>
                     <tr>
                       <th>Full Name</th>
-                      <th>Profile Number</th>
+                      <th>Square #</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -646,11 +617,11 @@ function Admin() {
                   </tbody>
                 </table>
                 <form onSubmit={handleProfileSubmit} className="sub-form">
-                  <h4>{editingProfile ? 'Edit Profile' : 'Add New Profile'}</h4>
+                  <h4>{editingProfile ? 'Edit Square Name' : 'Add New Square Name'}</h4>
                   <div className="form-group">
                     <input type="text" placeholder="Full Name" value={profileData.fullName} onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })} required />
                   </div>
-                  <button type="submit" className="btn btn-primary">{editingProfile ? 'Update Profile' : 'Add Profile'}</button>
+                  <button type="submit" className="btn btn-primary">{editingProfile ? 'Update Square Name' : 'Add Square Name'}</button>
                   {editingProfile && <button type="button" className="btn btn-secondary" onClick={() => { setEditingProfile(null); setProfileData({ fullName: '', profileNumber: '' }); }}>Cancel Edit</button>}
                 </form>
               </div>
@@ -685,15 +656,32 @@ function Admin() {
                 <form onSubmit={handlePaymentInfoSubmit} className="sub-form">
                   <h4>{editingPaymentInfo ? 'Edit Payment Method' : 'Add New Payment Method'}</h4>
                   <div className="form-group">
-                    <select value={paymentInfoData.paymentMethod} onChange={(e) => setPaymentInfoData({ ...paymentInfoData, paymentMethod: e.target.value })}>
+                    <select
+                      value={paymentInfoData.paymentMethod}
+                      onChange={(e) => {
+                        const next = e.target.value
+                        setPaymentInfoData((prev) => ({
+                          ...prev,
+                          paymentMethod: next,
+                          accountIdentifier: next === 'Cash' ? 'Cash' : prev.accountIdentifier,
+                        }))
+                      }}
+                    >
                       <option value="Venmo">Venmo</option>
-                      <option value="CashApp">CashApp</option>
                       <option value="Zelle">Zelle</option>
                       <option value="PayPal">PayPal</option>
+                      <option value="Cash">Cash</option>
                     </select>
                   </div>
                   <div className="form-group">
-                    <input type="text" placeholder="Account Identifier (e.g., @username, email)" value={paymentInfoData.accountIdentifier} onChange={(e) => setPaymentInfoData({ ...paymentInfoData, accountIdentifier: e.target.value })} required />
+                    <input
+                      type="text"
+                      placeholder="Account Identifier (e.g., @username, email)"
+                      value={paymentInfoData.paymentMethod === 'Cash' ? 'Cash' : paymentInfoData.accountIdentifier}
+                      onChange={(e) => setPaymentInfoData({ ...paymentInfoData, accountIdentifier: e.target.value })}
+                      disabled={paymentInfoData.paymentMethod === 'Cash'}
+                      required
+                    />
                   </div>
                   <div className="form-group">
                     <label>
@@ -818,7 +806,7 @@ function Admin() {
                 <h3>Edit Squares for this Pool</h3>
                 {/* Persistent profile dropdown for grid assignment */}
                 <div style={{ marginTop: '1em', marginBottom: '1em' }}>
-                  <label htmlFor="admin-profile-dropdown"><strong>Select Profile:</strong></label>
+                  <label htmlFor="admin-profile-dropdown"><strong>Select Square Name:</strong></label>
                   <select
                     id="admin-profile-dropdown"
                     value={selectedProfileId}
@@ -827,167 +815,50 @@ function Admin() {
                   >
                     <option value="">-- Unassigned --</option>
                     {allProfiles.length === 0
-                      ? <option disabled>-- No profiles found --</option>
+                      ? <option disabled>-- No square names found --</option>
                       : [...allProfiles].sort((a, b) => a.fullName.localeCompare(b.fullName)).map(profile => (
                           <option key={profile.id} value={profile.id}>{profile.fullName} ({profile.userEmail})</option>
                         ))}
                   </select>
                   <span style={{ marginLeft: '1em', color: '#888' }}>
-                    Select a profile, then click a square to assign/unassign.
+                    Select a square name, then click a square to assign/unassign.
                   </span>
                 </div>
                 <div className="grid-wrapper">
                   <div className="grid-container">
-                    {/* Score rows - 4 rows showing AFC numbers with quarter labels on left */}
-                    <div className="score-rows-container">
-                      {['Q1', 'Q2', 'Q3', 'FINAL'].map((quarter, qIdx) => {
-                        const quarterColors = ['#FCE5CD', '#FBBC04', '#B6D7A8', '#00FFFF']
-                        const quarterLabels = ['1Q', '1H', '3Q', 'FS']
-                        // Use AFC numbers from editPool, fallback to 0-9
-                        // Use AFC scores from sheet if available, else fallback
-                        let afcRow = (afcScores && Array.isArray(afcScores) && afcScores[qIdx]) ? afcScores[qIdx] : (editPool.afcNumbers ? editPool.afcNumbers.split(',').map(n => n.trim()) : [0,1,2,3,4,5,6,7,8,9]);
-                        return (
-                          <div key={quarter} style={{ display: 'flex', marginBottom: '2px' }}>
-                            {/* Empty spacing cells before label (qIdx cells) */}
-                            {Array.from({ length: qIdx }).map((_, i) => (
-                              <div
-                                key={`space-before-${qIdx}-${i}`}
-                                style={{
-                                  width: '40px',
-                                  height: '32px',
-                                  border: '1px solid #333',
-                                  backgroundColor: ['#FCE5CD', '#FBBC04', '#B6D7A8'][i] || quarterColors[qIdx],
-                                  boxSizing: 'border-box',
-                                  margin: 0,
-                                  padding: 0,
-                                }}
-                              />
-                            ))}
-                            <div
-                              style={{
-                                width: '40px',
-                                height: '32px',
-                                border: '1px solid #333',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 'bold',
-                                backgroundColor: quarterColors[qIdx],
-                                fontSize: '14px',
-                                boxSizing: 'border-box',
-                                margin: 0,
-                                padding: 0,
-                              }}
-                            >
-                              {quarterLabels[qIdx]}
-                            </div>
-                            {/* Empty spacing cells after label (3 - qIdx cells) */}
-                            {Array.from({ length: 3 - qIdx }).map((_, i) => (
-                              <div
-                                key={`space-after-${qIdx}-${i}`}
-                                style={{
-                                  width: '40px',
-                                  height: '32px',
-                                  border: '1px solid #333',
-                                  backgroundColor: quarterColors[qIdx],
-                                  boxSizing: 'border-box',
-                                  margin: 0,
-                                  padding: 0,
-                                }}
-                              />
-                            ))}
-                            {(afcRow && afcRow.length === 10 ? afcRow : Array(10).fill('')).map((num, colIdx) => (
-                              <div 
-                                key={`${quarter}-afc-${colIdx}`}
-                                style={{
-                                  width: '80px',
-                                  height: '32px',
-                                  border: '1px solid #333',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontWeight: 'bold',
-                                  backgroundColor: quarterColors[qIdx],
-                                  fontSize: '16px',
-                                  textAlign: 'center',
-                                }}
-                              >
-                                {typeof num === 'string' && num.trim() !== '' ? num : ''}
-                              </div>
-                            ))}
-                          </div>
-                        )
-                      })}
-                    </div>
-                    {/* Main grid area with NFC score columns on left */}
-                    <div className="main-grid-area">
-                      {/* 10x10 Grid of squares with NFC numbers on left */}
-                      <div className="squares-grid">
-                        {/* Use NFC numbers from editPool, fallback to 0-9 for 4 columns */}
-                        {Array.from({ length: 10 }).map((_, row) => {
-                          const quarterColors = ['#FCE5CD', '#FBBC04', '#B6D7A8', '#00FFFF']
-                          // Use NFC scores from sheet if available, else fallback
-                          let nfcRow = (nfcScores && Array.isArray(nfcScores) && nfcScores[row]) ? nfcScores[row] : (editPool.nfcNumbers ? Array(4).fill(editPool.nfcNumbers.split(',').map(n => n.trim())[row] ?? '') : Array(4).fill(''));
+                    <div className="grid-only">
+                      {Array.from({ length: 10 }).map((_, row) =>
+                        Array.from({ length: 10 }).map((_, col) => {
+                          let square = editSquares.find((sq) => sq.rowPosition === row && sq.colPosition === col)
+                          if (!square) {
+                            square = { rowPosition: row, colPosition: col }
+                          }
+
+                          const isOwned = square?.profile && selectedProfileId && square.profile.id === parseInt(selectedProfileId)
+                          const isClaimed = square?.profile || square?.profileName
+
+                          let squareClass = 'grid-square'
+                          if (isOwned) {
+                            squareClass += ' owned'
+                          } else if (isClaimed) {
+                            squareClass += ' claimed'
+                          } else {
+                            squareClass += ' available'
+                          }
+
                           return (
-                            <div key={`row-${row}`} className="grid-row-wrapper">
-                              {/* NFC Score Columns - one number per row for each quarter */}
-                              <div className="nfc-score-columns">
-                                {nfcRow.map((nfcNum, qIdx) => (
-                                  <div 
-                                    key={`nfc-col-${qIdx}-row-${row}`}
-                                    style={{
-                                      width: '40px',
-                                      height: '60px',
-                                      border: '1px solid #333',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontWeight: 'bold',
-                                      backgroundColor: quarterColors[qIdx],
-                                      fontSize: '16px',
-                                      boxSizing: 'border-box',
-                                      margin: 0,
-                                      padding: 0,
-                                    }}
-                                  >
-                                    {typeof nfcNum === 'string' && nfcNum.trim() !== '' ? nfcNum : ''}
-                                  </div>
-                                ))}
-                              </div>
-                              {/* Grid squares for this row */}
-                              <div className="grid-row">
-                                {Array.from({ length: 10 }).map((_, col) => {
-                                  let square = editSquares.find(sq => sq.rowPosition === row && sq.colPosition === col);
-                                  if (!square) {
-                                    square = { rowPosition: row, colPosition: col };
-                                  }
-                                  const isOwned = square?.profile && selectedProfileId && square.profile.id === parseInt(selectedProfileId);
-                                  const isClaimed = square?.profile || square?.profileName;
-                                  let squareClass = 'grid-square';
-                                  if (isOwned) {
-                                    squareClass += ' owned';
-                                  } else if (isClaimed) {
-                                    squareClass += ' claimed';
-                                  } else {
-                                    squareClass += ' available';
-                                  }
-                                  return (
-                                    <div
-                                      key={`square-${row}-${col}`}
-                                      className={squareClass}
-                                      title={square?.profileName || 'Available'}
-                                      style={{ cursor: 'pointer' }}
-                                      onClick={() => handleAdminSquareClick(square)}
-                                    >
-                                      {square?.profileName || ''}
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                            <div
+                              key={`square-${row}-${col}`}
+                              className={squareClass}
+                              title={square?.profileName || 'Available'}
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => handleAdminSquareClick(square)}
+                            >
+                              {square?.profileName || ''}
                             </div>
                           )
-                        })}
-                      </div>
+                        })
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1001,11 +872,11 @@ function Admin() {
             <h3>Edit Square</h3>
             <p>Row: {selectedSquare?.rowPosition ?? '--'}, Col: {selectedSquare?.colPosition ?? '--'}</p>
             <div className="form-group">
-              <label>Assign Profile:</label>
+              <label>Assign Square Name:</label>
               <select value={selectedProfileId} onChange={e => setSelectedProfileId(e.target.value)}>
                 <option value="">-- Unassigned --</option>
                 {allProfiles.length === 0
-                  ? <option disabled>-- No profiles found --</option>
+                  ? <option disabled>-- No square names found --</option>
                   : [...allProfiles].sort((a, b) => a.fullName.localeCompare(b.fullName)).map(profile => (
                       <option key={profile.id} value={profile.id}>{profile.fullName} ({profile.userEmail})</option>
                     ))}

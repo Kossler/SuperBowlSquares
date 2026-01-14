@@ -24,7 +24,7 @@ function Login() {
     try {
       const response = await loginService(email, password)
       login(response)
-      navigate('/')
+      navigate('/entry')
     } catch (err) {
       setError('Invalid email or password')
     } finally {
@@ -37,11 +37,15 @@ function Login() {
     setError('')
 
     if (profiles.some(p => !p.fullName.trim())) {
-      setError('All profile names must be filled')
+      setError('All square names must be filled')
       return
     }
 
-    if (!accountIdentifier.trim()) {
+    const normalizedAccountIdentifier = paymentMethod === 'Cash'
+      ? 'Cash'
+      : accountIdentifier
+
+    if (!normalizedAccountIdentifier.trim()) {
       setError('Payment information is required')
       return
     }
@@ -55,17 +59,17 @@ function Login() {
         profiles: profiles.filter(p => p.fullName.trim()).map(p => ({ fullName: p.fullName })),
         paymentInfo: {
           paymentMethod,
-          accountIdentifier,
+          accountIdentifier: normalizedAccountIdentifier,
         },
       }
 
       const response = await signupService(signupData)
       login(response)
-      navigate('/')
+      navigate('/entry')
     } catch (err) {
       let backendMsg = err?.response?.data?.message || err?.response?.data?.error || '';
       if (backendMsg.toLowerCase().includes('full name')) {
-        setError('A profile with this full name already exists. Please choose a different name.');
+        setError('A square name with this full name already exists. Please choose a different name.');
       } else if (backendMsg.toLowerCase().includes('email already exists')) {
         setError('Email already exists. Please use a different email.');
       } else if (backendMsg) {
@@ -79,7 +83,7 @@ function Login() {
   }
 
   const addProfile = () => {
-    if (profiles.length < 9) {
+    if (profiles.length < 10) {
       setProfiles([...profiles, { fullName: '' }])
     }
   }
@@ -129,14 +133,14 @@ function Login() {
             {isSignup && (
               <>
                 <div className="form-group">
-                  <label>Profiles (up to 9):</label>
+                  <label>Square Names (up to 10):</label>
                   {profiles.map((profile, index) => (
                     <div key={index} className="profile-input-group">
                       <input
                         type="text"
                         value={profile.fullName}
                         onChange={(e) => updateProfile(index, e.target.value)}
-                        placeholder={`Profile ${index + 1} Name`}
+                        placeholder={`Square Name ${index + 1}`}
                         required
                       />
                       {profiles.length > 1 && (
@@ -150,14 +154,14 @@ function Login() {
                       )}
                     </div>
                   ))}
-                  {profiles.length < 9 && (
+                  {profiles.length < 10 && (
                     <button
                       type="button"
                       className="btn btn-secondary"
                       onClick={addProfile}
                       style={{ marginTop: '10px' }}
                     >
-                      Add Profile
+                      Add Square Name
                     </button>
                   )}
                 </div>
@@ -166,25 +170,35 @@ function Login() {
                   <label>Payment Method:</label>
                   <select
                     value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setPaymentMethod(next)
+                      if (next === 'Cash') {
+                        setAccountIdentifier('Cash')
+                      } else if (accountIdentifier.trim() === 'Cash') {
+                        setAccountIdentifier('')
+                      }
+                    }}
                   >
                     <option value="Venmo">Venmo</option>
-                    <option value="CashApp">CashApp</option>
                     <option value="Zelle">Zelle</option>
                     <option value="PayPal">PayPal</option>
+                    <option value="Cash">Cash</option>
                   </select>
                 </div>
 
-                <div className="form-group">
-                  <label>Account Name / Phone / Email:</label>
-                  <input
-                    type="text"
-                    value={accountIdentifier}
-                    onChange={(e) => setAccountIdentifier(e.target.value)}
-                    placeholder="Your payment account identifier"
-                    required
-                  />
-                </div>
+                {paymentMethod !== 'Cash' ? (
+                  <div className="form-group">
+                    <label>Account Name / Phone / Email:</label>
+                    <input
+                      type="text"
+                      value={accountIdentifier}
+                      onChange={(e) => setAccountIdentifier(e.target.value)}
+                      placeholder="Your payment account identifier"
+                      required
+                    />
+                  </div>
+                ) : null}
               </>
             )}
 
