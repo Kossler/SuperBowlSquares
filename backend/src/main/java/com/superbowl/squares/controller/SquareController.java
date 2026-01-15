@@ -27,9 +27,9 @@ public class SquareController {
 
     @GetMapping("/pool/{poolId}")
     public ResponseEntity<List<Square>> getSquaresByPool(@PathVariable Long poolId) {
-        logger.info("[getSquaresByPool] poolId received: {}", poolId);
+        logger.debug("[getSquaresByPool] poolId received: {}", poolId);
         List<Square> squares = squareService.getSquaresByPool(poolId);
-        logger.info("[getSquaresByPool] squares found: {}", squares.size());
+        logger.debug("[getSquaresByPool] squares found: {}", squares.size());
         return ResponseEntity.ok(squares);
     }
 
@@ -51,9 +51,9 @@ public class SquareController {
 
     @GetMapping("/pool/{poolId}/stats")
     public ResponseEntity<Map<String, Object>> getPoolStats(@PathVariable Long poolId) {
-        logger.info("[getPoolStats] poolId received: {}", poolId);
+        logger.debug("[getPoolStats] poolId received: {}", poolId);
         long claimedCount = squareService.getClaimedCount(poolId);
-        logger.info("[getPoolStats] claimedCount: {}", claimedCount);
+        logger.debug("[getPoolStats] claimedCount: {}", claimedCount);
         Map<String, Object> stats = new HashMap<>();
         stats.put("claimedCount", claimedCount);
         stats.put("availableCount", 100 - claimedCount);

@@ -19,6 +19,13 @@ function Account() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  useEffect(() => {
+    if (!error) return
+    window.alert(error)
+  }, [error])
+
+  const normalizeFullName = useCallback((value) => (value ?? '').trim().toLowerCase(), [])
+
   const [me, setMe] = useState(null)
 
   const [newEmail, setNewEmail] = useState('')
@@ -136,8 +143,24 @@ function Account() {
     setError('')
     setSuccess('')
 
+    // Front-end uniqueness check (case-insensitive, trimmed) against current user's profiles
+    const candidate = normalizeFullName(profileData.fullName)
+    if (!candidate) {
+      setError('Square name is required.')
+      return
+    }
+    const duplicate = sortedProfiles.some((p) => {
+      if (!p) return false
+      if (editingProfile?.id != null && p.id === editingProfile.id) return false
+      return normalizeFullName(p.fullName) === candidate
+    })
+    if (duplicate) {
+      setError('A square name with this full name already exists.')
+      return
+    }
+
     try {
-      const payload = { fullName: profileData.fullName }
+      const payload = { fullName: profileData.fullName.trim() }
 
       if (editingProfile) {
         await updateMyProfile(editingProfile.id, payload)

@@ -18,7 +18,7 @@ public class GoogleSheetsController {
                     @PathVariable String spreadsheetId,
                     @PathVariable String poolName
             ) {
-                logger.info("[getNfcScores] spreadsheetId={}, poolName={}", spreadsheetId, poolName);
+                logger.debug("[getNfcScores] spreadsheetId={}, poolName={}", spreadsheetId, poolName);
                 try {
                     List<List<Object>> scores = googleSheetsService.readSheet(spreadsheetId, poolName, "A6:D15");
                     logger.debug("[getNfcScores] Retrieved NFC scores: rows={}", scores == null ? 0 : scores.size());
@@ -34,7 +34,7 @@ public class GoogleSheetsController {
                 @PathVariable String spreadsheetId,
                 @PathVariable String poolName
         ) {
-            logger.info("[getAfcScores] spreadsheetId={}, poolName={}", spreadsheetId, poolName);
+            logger.debug("[getAfcScores] spreadsheetId={}, poolName={}", spreadsheetId, poolName);
             try {
                 List<List<Object>> scores = googleSheetsService.readSheet(spreadsheetId, poolName, "F1:O4");
                 logger.debug("[getAfcScores] Retrieved AFC scores: rows={}", scores == null ? 0 : scores.size());

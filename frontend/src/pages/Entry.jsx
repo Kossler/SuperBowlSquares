@@ -84,6 +84,11 @@ function Entry() {
   }, [])
 
   useEffect(() => {
+    if (!profileSummaryError) return
+    window.alert(profileSummaryError)
+  }, [profileSummaryError])
+
+  useEffect(() => {
     const media = window.matchMedia('(max-width: 700px)')
     const update = () => setIsMobile(Boolean(media.matches))
 

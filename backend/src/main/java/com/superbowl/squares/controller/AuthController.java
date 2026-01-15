@@ -39,6 +39,9 @@ public class AuthController {
     @GetMapping("/me")
     @JsonView(View.Detail.class)
     public ResponseEntity<User> getMe(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
         User user = authService.getUserFromAuthentication(authentication);
         return ResponseEntity.ok(user);
     }

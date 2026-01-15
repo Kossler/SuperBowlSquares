@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login as loginService, signup as signupService } from '../services/squaresService'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -15,6 +15,13 @@ function Login() {
   const [accountIdentifier, setAccountIdentifier] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!error) return
+    window.alert(error)
+  }, [error])
+
+  const normalizeFullName = (value) => (value ?? '').trim().toLowerCase()
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -41,6 +48,16 @@ function Login() {
       return
     }
 
+    // Front-end uniqueness check (case-insensitive, trimmed)
+    {
+      const normalized = profiles.map((p) => normalizeFullName(p.fullName)).filter(Boolean)
+      const unique = new Set(normalized)
+      if (unique.size !== normalized.length) {
+        setError('Square names must be unique.')
+        return
+      }
+    }
+
     const normalizedAccountIdentifier = paymentMethod === 'Cash'
       ? 'Cash'
       : accountIdentifier
@@ -56,7 +73,9 @@ function Login() {
       const signupData = {
         email,
         password,
-        profiles: profiles.filter(p => p.fullName.trim()).map(p => ({ fullName: p.fullName })),
+        profiles: profiles
+          .filter((p) => p.fullName.trim())
+          .map((p) => ({ fullName: p.fullName.trim() })),
         paymentInfo: {
           paymentMethod,
           accountIdentifier: normalizedAccountIdentifier,
