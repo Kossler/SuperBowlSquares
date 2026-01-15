@@ -167,7 +167,27 @@ public class UserAccountService {
         Profile saved = profileRepository.save(profile);
 
         try {
-            syncOwnersRow(getMe(dbUser), null, null);
+            // Ensure Owners sync sees the newly created profile.
+            // NOTE: saving Profile does not mutate dbUser.getProfiles(); within the same persistence
+            // context `findById` may return the cached User with a stale profiles collection.
+            entityManager.flush();
+            entityManager.clear();
+
+            User refreshed = userRepository.findById(user.getId())
+                    .orElseThrow(() -> new RuntimeException("User not found after profile create"));
+            List<Profile> freshProfiles = profileRepository.findByUserId(user.getId());
+            List<PaymentInfo> freshPaymentInfos = paymentInfoRepository.findByUserId(user.getId());
+
+            User snapshot = new User();
+            snapshot.setId(refreshed.getId());
+            snapshot.setEmail(refreshed.getEmail());
+            snapshot.setIsAdmin(refreshed.getIsAdmin());
+            snapshot.setProfiles(freshProfiles);
+            snapshot.setPaymentInfos(freshPaymentInfos);
+            snapshot.setCreatedAt(refreshed.getCreatedAt());
+            snapshot.setUpdatedAt(refreshed.getUpdatedAt());
+
+            syncOwnersRow(snapshot, null, null);
         } catch (Exception e) {
             System.err.println("[WARN] Failed to update Owners sheet after profile create: " + e.getMessage());
         }

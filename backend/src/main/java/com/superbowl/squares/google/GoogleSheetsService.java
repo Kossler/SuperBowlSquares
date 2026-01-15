@@ -200,7 +200,8 @@ public class GoogleSheetsService {
         ValueRange response = service.spreadsheets().values()
                 .get(spreadsheetId, fullRange)
                 .execute();
-        return response.getValues();
+        List<List<Object>> values = response.getValues();
+        return values != null ? values : java.util.Collections.emptyList();
     }
 
     // Example: Update values in a sheet/tab by name
