@@ -16,7 +16,8 @@ import {
   updatePaymentInfo,
   deletePaymentInfo,
   updateCellInSheet,
-  getPoolById
+  getPoolById,
+  setPoolLocked
 } from '../services/squaresService'
 import './Admin.css'
 import SquaresGrid from '../components/SquaresGrid'
@@ -67,6 +68,16 @@ function Admin() {
         });
       }
     }, [showEditPool, editPool]);
+
+    const handleLockPool = async (poolId, locked) => {
+      try {
+        await setPoolLocked(poolId, locked);
+        setMessage(locked ? 'Pool locked' : 'Pool unlocked');
+        loadPools();
+      } catch (err) {
+        setError('Failed to update lock status');
+      }
+    } 
 
     const editSquaresSheetName = useMemo(() => {
       return editSquaresPool?.poolName || editPool?.poolName || 'Sheet1'
@@ -457,6 +468,7 @@ function Admin() {
                   <th>Bet Amount</th>
                   <th>Status</th>
                   <th>Actions</th>
+                  <th>Locked</th>
                 </tr>
               </thead>
               <tbody>
@@ -470,11 +482,21 @@ function Admin() {
                       </span>
                     </td>
                     <td>
+                      <span className={`status-badge ${pool.isLocked ? 'locked' : 'unlocked'}`}>{pool.isLocked ? 'Locked' : 'Unlocked'}</span>
+                    </td>
+                    <td>
                       <button
                         className="btn btn-secondary"
                         onClick={() => handleTogglePool(pool.id)}
                       >
                         Toggle
+                      </button>
+                      <button
+                        className="btn btn-warning"
+                        onClick={() => handleLockPool(pool.id, !pool.isLocked)}
+                        style={{ marginLeft: '10px' }}
+                      >
+                        {pool.isLocked ? 'Unlock' : 'Lock'}
                       </button>
                       <button
                         className="btn btn-primary"

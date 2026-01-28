@@ -31,14 +31,11 @@ function SquaresGrid({ poolId, onSquareClaimed, selectedProfileId }) {
       const squaresData = await getSquaresByPool(poolId)
       setSquares(squaresData)
 
-      // Avoid re-fetching all pools on every refresh (especially after each click).
-      // Only refresh pool metadata when we don't already have it for this poolId.
-      if (!pool || pool.id !== poolId) {
-        const poolsData = await getActivePools()
-        const selectedPoolData = poolsData.find(p => p.id === poolId)
-        setPool(selectedPoolData)
-      }
-      
+      // Always fetch pool metadata for lock status
+      const poolsData = await getActivePools()
+      const selectedPoolData = poolsData.find(p => p.id === poolId)
+      setPool(selectedPoolData)
+
       setLoading(false)
     } catch (err) {
       setError('Failed to load squares')
@@ -52,6 +49,12 @@ function SquaresGrid({ poolId, onSquareClaimed, selectedProfileId }) {
     if (!selectedProfileId) return;
     if (!square) return;
     setError('');
+
+    // Prevent editing if pool is locked (unless admin panel, which uses a different component)
+    if (pool?.isLocked) {
+      setError('This pool is locked. No further changes allowed.');
+      return;
+    }
 
     const spreadsheetId = '1zXue8QE0GBV5GRWv7k5JSR67yRjMf3o7Cj9egY4Fguk';
     const sheetName = pool?.poolName || 'Sheet1';
@@ -216,12 +219,12 @@ function SquaresGrid({ poolId, onSquareClaimed, selectedProfileId }) {
                 return (
                   <div
                     key={`square-${row}-${col}`}
-                    className={`grid-square ${isClaimed ? 'claimed' : 'available'} ${owned ? 'owned' : ''}`}
+                    className={`grid-square ${isClaimed ? 'claimed' : 'available'} ${owned ? 'owned' : ''} ${pool?.isLocked ? 'locked' : ''}`}
                     onClick={() => handleSquareClick(square)}
-                    title={square?.profileName || 'Available'}
-                    style={{ cursor: (!square?.profile || owned) ? 'pointer' : 'not-allowed' }}
+                    title={pool?.isLocked ? 'Locked' : (square?.profileName || 'Available')}
+                    style={{ cursor: pool?.isLocked ? 'not-allowed' : ((!square?.profile || owned) ? 'pointer' : 'not-allowed') }}
                   >
-                    {square?.profileName || ''}
+                    {square?.profileName || (pool?.isLocked ? '🔒' : '')}
                   </div>
                 )
               })

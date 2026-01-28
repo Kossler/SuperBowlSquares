@@ -1,10 +1,11 @@
+import api from './api'
+import { setToken, setUser } from '../utils/auth'
+
 // Get all profiles with user email (for admin assignment)
 export const getAllProfiles = async () => {
   const response = await api.get('/api/admin/profiles');
   return response.data;
 }
-import api from './api'
-import { setToken, setUser } from '../utils/auth'
 
 // Update a single cell in Google Sheets via backend
 export const updateCellInSheet = async (spreadsheetId, poolName, row, col, value) => {
@@ -94,6 +95,11 @@ export const togglePoolStatus = async (poolId) => {
 export const updatePool = async (poolId, poolData) => {
   const response = await api.put(`/api/admin/pools/${poolId}`, poolData)
   return response.data
+}
+
+export const setPoolLocked = async (poolId, locked) => {
+  const response = await api.patch(`/api/admin/pools/${poolId}/lock?locked=${locked}`);
+  return response.data;
 }
 
 export const deletePool = (poolId) => api.delete(`/api/admin/pools/${poolId}`)

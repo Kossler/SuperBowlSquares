@@ -1,4 +1,3 @@
-
 package com.superbowl.squares.controller;
 
 import com.fasterxml.jackson.annotation.JsonView;
@@ -58,10 +57,22 @@ public class AdminController {
         return ResponseEntity.ok(poolService.getAllPools());
     }
 
+
     @PatchMapping("/pools/{id}/toggle")
     public ResponseEntity<Pool> togglePoolStatus(@PathVariable Long id) {
         try {
             Pool pool = poolService.togglePoolStatus(id);
+            return ResponseEntity.ok(pool);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    // Lock or unlock a pool
+    @PatchMapping("/pools/{id}/lock")
+    public ResponseEntity<Pool> setPoolLocked(@PathVariable Long id, @RequestParam boolean locked) {
+        try {
+            Pool pool = poolService.setPoolLocked(id, locked);
             return ResponseEntity.ok(pool);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();

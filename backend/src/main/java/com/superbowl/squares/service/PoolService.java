@@ -20,6 +20,13 @@ public class PoolService {
     @Autowired
     private SquareRepository squareRepository;
 
+    @Transactional
+    public Pool setPoolLocked(Long poolId, boolean locked) {
+        Pool pool = getPoolById(poolId);
+        pool.setIsLocked(locked);
+        return poolRepository.save(pool);
+    }
+
     public List<Pool> getActivePools() {
         return poolRepository.findByIsActiveTrue();
     }

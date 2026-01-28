@@ -34,6 +34,10 @@ public class Pool {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+
+    @Column(name = "is_locked", nullable = false)
+    private Boolean isLocked = false;
+
     @OneToMany(mappedBy = "pool", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Square> squares = new ArrayList<>();
 
